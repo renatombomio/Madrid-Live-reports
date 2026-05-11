@@ -3,7 +3,28 @@
     "allow": [
       "Bash(pnpm --version)",
       "Bash(docker --version)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(git commit *)",
+      "Bash(corepack enable *)",
+      "Bash(corepack prepare *)",
+      "Bash(pnpm install *)",
+      "Bash(node *)",
+      "Bash(pnpm dev *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4321/)",
+      "Bash(node_modules/.bin/astro dev *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4322/)",
+      "Bash(curl -s http://localhost:4322/)",
+      "Bash(pnpm approve-builds *)",
+      "Bash(git add *)",
+      "Bash(docker-compose --version)",
+      "Bash(node_modules/.bin/drizzle-kit generate *)",
+      "Bash(node_modules/.bin/drizzle-kit migrate *)",
+      "Bash(pnpm add *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4321/reports)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4321/news)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4321/admin/login)",
+      "Bash(curl *)",
+      "Bash(node_modules/.bin/tsx *)"
     ]
   }
 }
