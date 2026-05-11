@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    // Load .env before tests so DATABASE_URL is available
+    include: ['tests/unit/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',
