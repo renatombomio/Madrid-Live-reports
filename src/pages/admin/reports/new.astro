@@ -1,0 +1,23 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import ReportForm from '../../../components/admin/ReportForm.astro';
+import { auth } from '../../../lib/auth';
+import { db } from '../../../db';
+import { districts, tags } from '../../../db/schema';
+import { asc } from 'drizzle-orm';
+
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+if (!session || session.user.role === 'viewer') return Astro.redirect('/admin/login');
+
+const [districtList, tagList] = await Promise.all([
+  db.select().from(districts).orderBy(asc(districts.name)),
+  db.select().from(tags).orderBy(asc(tags.name)),
+]);
+---
+
+<BaseLayout title="Nuevo informe — Admin">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-2xl font-bold mb-8">Nuevo informe</h1>
+    <ReportForm mode="create" districts={districtList} tags={tagList} />
+  </div>
+</BaseLayout>

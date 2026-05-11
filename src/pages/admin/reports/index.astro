@@ -1,0 +1,189 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { auth } from '../../../lib/auth';
+import { db } from '../../../db';
+import { reports, user, districts } from '../../../db/schema';
+import { CATEGORY_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../../lib/content-labels';
+import { eq, desc } from 'drizzle-orm';
+
+const session = await auth.api.getSession({ headers: Astro.request.headers });
+if (!session || session.user.role === 'viewer') return Astro.redirect('/admin/login');
+
+const allReports = await db
+  .select({
+    id: reports.id,
+    title: reports.title,
+    slug: reports.slug,
+    status: reports.status,
+    category: reports.category,
+    publishedAt: reports.publishedAt,
+    updatedAt: reports.updatedAt,
+    authorName: user.name,
+    districtName: districts.name,
+  })
+  .from(reports)
+  .innerJoin(user, eq(reports.authorId, user.id))
+  .leftJoin(districts, eq(reports.districtId, districts.id))
+  .orderBy(desc(reports.updatedAt));
+
+const fmt = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' });
+---
+
+<BaseLayout title="Informes — Admin">
+  <div class="max-w-6xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <a href="/admin" class="text-sm text-gray-400 hover:text-madrid-red no-underline">Admin</a>
+        <span class="text-gray-300 mx-2">/</span>
+        <span class="text-sm text-gray-600 font-medium">Informes</span>
+      </div>
+      <a
+        href="/admin/reports/new"
+        class="px-4 py-2 bg-madrid-red text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors no-underline"
+      >
+        + Nuevo informe
+      </a>
+    </div>
+
+    {allReports.length === 0 ? (
+      <div class="text-center py-24 border-2 border-dashed border-gray-200 rounded-xl">
+        <p class="text-gray-400 mb-4">No hay informes todavía</p>
+        <a href="/admin/reports/new" class="text-madrid-red text-sm hover:underline">
+          Crear el primero →
+        </a>
+      </div>
+    ) : (
+      <div class="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+        <table class="w-full text-sm">
+          <thead class="border-b border-gray-100 bg-gray-50">
+            <tr>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Título</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Categoría</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Actualizado</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {allReports.map((report) => (
+              <tr class="hover:bg-gray-50/50 transition-colors group" data-id={report.id} data-status={report.status}>
+                <td class="px-4 py-3">
+                  <div class="font-medium text-gray-900 group-hover:text-madrid-red transition-colors">
+                    {report.title}
+                  </div>
+                  {report.districtName && (
+                    <div class="text-xs text-gray-400 mt-0.5">{report.districtName}</div>
+                  )}
+                </td>
+                <td class="px-4 py-3 hidden md:table-cell">
+                  <span class="text-gray-500">{CATEGORY_LABELS[report.category] ?? report.category}</span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class={`inline-block text-xs font-medium px-2 py-0.5 rounded status-badge ${STATUS_COLORS[report.status]}`}>
+                    {STATUS_LABELS[report.status]}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-gray-400 hidden lg:table-cell">
+                  {fmt.format(report.updatedAt)}
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2 justify-end">
+                    <a
+                      href={`/admin/reports/${report.id}/edit`}
+                      class="text-xs text-gray-500 hover:text-madrid-red transition-colors no-underline px-2 py-1 rounded hover:bg-gray-100"
+                    >
+                      Editar
+                    </a>
+                    <button
+                      class="publish-btn text-xs px-2 py-1 rounded border transition-colors"
+                      class:list={[
+                        report.status === 'published'
+                          ? 'border-gray-200 text-gray-500 hover:border-yellow-400 hover:text-yellow-700'
+                          : 'border-madrid-red text-madrid-red hover:bg-madrid-red hover:text-white'
+                      ]}
+                    >
+                      {report.status === 'published' ? 'Despublicar' : 'Publicar'}
+                    </button>
+                    <button class="delete-btn text-xs px-2 py-1 rounded border border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-600 transition-colors">
+                      Borrar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<script>
+  // Publish / unpublish toggle
+  document.querySelectorAll('.publish-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('tr');
+      const id = row.dataset.id;
+      const currentStatus = row.dataset.status;
+      const nextStatus = currentStatus === 'published' ? 'draft' : 'published';
+
+      btn.textContent = '…';
+      btn.disabled = true;
+
+      const res = await fetch(`/api/admin/reports/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+
+      if (res.ok) {
+        // Update row state without a full reload
+        row.dataset.status = nextStatus;
+        const badge = row.querySelector('.status-badge');
+        if (nextStatus === 'published') {
+          badge.textContent = 'Publicado';
+          badge.className = 'inline-block text-xs font-medium px-2 py-0.5 rounded status-badge bg-green-100 text-green-800';
+          btn.textContent = 'Despublicar';
+          btn.className = 'publish-btn text-xs px-2 py-1 rounded border transition-colors border-gray-200 text-gray-500 hover:border-yellow-400 hover:text-yellow-700';
+        } else {
+          badge.textContent = 'Borrador';
+          badge.className = 'inline-block text-xs font-medium px-2 py-0.5 rounded status-badge bg-yellow-100 text-yellow-800';
+          btn.textContent = 'Publicar';
+          btn.className = 'publish-btn text-xs px-2 py-1 rounded border transition-colors border-madrid-red text-madrid-red hover:bg-madrid-red hover:text-white';
+        }
+      } else {
+        alert('No se pudo cambiar el estado. Inténtalo de nuevo.');
+        btn.textContent = currentStatus === 'published' ? 'Despublicar' : 'Publicar';
+      }
+      btn.disabled = false;
+    });
+  });
+
+  // Delete
+  document.querySelectorAll('.delete-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('tr');
+      const id = row.dataset.id;
+      const title = row.querySelector('td .font-medium')?.textContent?.trim();
+
+      if (!confirm(`¿Borrar "${title}"? Esta acción no se puede deshacer.`)) return;
+
+      btn.textContent = '…';
+      btn.disabled = true;
+
+      const res = await fetch(`/api/admin/reports/${id}`, { method: 'DELETE' });
+
+      if (res.ok) {
+        row.style.transition = 'opacity 0.3s';
+        row.style.opacity = '0';
+        setTimeout(() => row.remove(), 300);
+      } else {
+        alert('No se pudo borrar. Inténtalo de nuevo.');
+        btn.textContent = 'Borrar';
+        btn.disabled = false;
+      }
+    });
+  });
+</script>

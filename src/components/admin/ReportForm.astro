@@ -1,0 +1,423 @@
+---
+import { CATEGORY_LABELS } from '../../lib/content-labels';
+import type { InferSelectModel } from 'drizzle-orm';
+import type { reports, districts, tags } from '../../db/schema';
+
+type Report = InferSelectModel<typeof reports>;
+type District = InferSelectModel<typeof districts>;
+type Tag = InferSelectModel<typeof tags>;
+
+interface Props {
+  mode: 'create' | 'edit';
+  report?: Report & { tagIds?: string[] };
+  districts: District[];
+  tags: Tag[];
+}
+
+const { mode, report, districts: districtList, tags: tagList } = Astro.props;
+const isEdit = mode === 'edit';
+const submitUrl = isEdit ? `/api/admin/reports/${report!.id}` : '/api/admin/reports';
+const submitMethod = isEdit ? 'PATCH' : 'POST';
+---
+
+<form id="report-form" class="flex flex-col gap-0" novalidate>
+  <!-- ── Top bar ───────────────────────────────────────────── -->
+  <div class="flex items-center justify-between gap-4 mb-8">
+    <a href="/admin/reports" class="text-sm text-gray-500 hover:text-madrid-red no-underline">
+      ← Volver a informes
+    </a>
+    <div class="flex items-center gap-3">
+      <span id="form-status" class="text-sm text-gray-400 hidden"></span>
+      <button
+        type="button"
+        id="btn-draft"
+        class="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+      >
+        Guardar borrador
+      </button>
+      <button
+        type="button"
+        id="btn-publish"
+        class="px-4 py-2 text-sm bg-madrid-red text-white rounded-md hover:bg-red-700 transition-colors"
+      >
+        {isEdit && report?.status === 'published' ? 'Actualizar' : 'Publicar'}
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <!-- ── Main column ──────────────────────────────────────── -->
+    <div class="lg:col-span-2 flex flex-col gap-6">
+
+      <!-- Title -->
+      <div>
+        <label for="title" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Título <span class="text-madrid-red">*</span>
+        </label>
+        <input
+          id="title"
+          name="title"
+          type="text"
+          required
+          value={report?.title ?? ''}
+          placeholder="El título del informe"
+          class="w-full px-3 py-2.5 border border-gray-200 rounded-md text-lg font-medium focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
+        />
+      </div>
+
+      <!-- Slug -->
+      <div>
+        <label for="slug" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Slug (URL)
+        </label>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-gray-400 whitespace-nowrap">/reports/</span>
+          <input
+            id="slug"
+            name="slug"
+            type="text"
+            value={report?.slug ?? ''}
+            placeholder="se-genera-del-titulo"
+            class="flex-1 px-3 py-2 border border-gray-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
+          />
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Se auto-genera del título. Edítalo para personalizarlo.</p>
+      </div>
+
+      <!-- Summary -->
+      <div>
+        <label for="summary" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Resumen <span class="text-madrid-red">*</span>
+        </label>
+        <textarea
+          id="summary"
+          name="summary"
+          required
+          rows="3"
+          placeholder="Descripción breve que aparece en las tarjetas y el SEO"
+          class="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red resize-none"
+        >{report?.summary ?? ''}</textarea>
+      </div>
+
+      <!-- Content editor -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          Contenido <span class="text-madrid-red">*</span>
+        </label>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200 mb-0">
+          <button type="button" id="tab-write"
+            class="px-4 py-2 text-sm font-medium border-b-2 border-madrid-red text-madrid-red -mb-px">
+            Editar
+          </button>
+          <button type="button" id="tab-preview"
+            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px">
+            Vista previa
+          </button>
+        </div>
+
+        <!-- Toolbar -->
+        <div id="editor-toolbar" class="flex flex-wrap gap-1 border border-b-0 border-gray-200 bg-gray-50 px-2 py-1.5 rounded-t-none">
+          {[
+            { label: 'B', title: 'Negrita', tag: '<strong>', close: '</strong>' },
+            { label: 'I', title: 'Cursiva', tag: '<em>', close: '</em>' },
+            { label: 'H2', title: 'Título H2', tag: '<h2>', close: '</h2>' },
+            { label: 'H3', title: 'Subtítulo H3', tag: '<h3>', close: '</h3>' },
+            { label: '¶', title: 'Párrafo', tag: '<p>', close: '</p>' },
+            { label: '🔗', title: 'Enlace', tag: '<a href="">', close: '</a>' },
+            { label: '<>', title: 'Código inline', tag: '<code>', close: '</code>' },
+            { label: '```', title: 'Bloque de código', tag: '<pre><code>', close: '</code></pre>' },
+            { label: '❝', title: 'Cita', tag: '<blockquote>', close: '</blockquote>' },
+            { label: '─', title: 'Separador', tag: '<hr />', close: '' },
+          ].map(({ label, title, tag, close }) => (
+            <button
+              type="button"
+              title={title}
+              data-tag={tag}
+              data-close={close}
+              class="toolbar-btn px-2 py-0.5 text-xs font-mono border border-gray-300 rounded bg-white hover:bg-madrid-red hover:text-white hover:border-madrid-red transition-colors"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <!-- Write area -->
+        <div id="write-panel">
+          <textarea
+            id="content"
+            name="content"
+            required
+            rows="20"
+            placeholder="<p>Escribe el contenido del informe en HTML...</p>"
+            class="w-full px-3 py-3 border border-gray-200 rounded-b-md text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red resize-y"
+          >{report?.content ?? ''}</textarea>
+        </div>
+
+        <!-- Preview area (hidden by default) -->
+        <div
+          id="preview-panel"
+          class="hidden border border-gray-200 rounded-b-md p-4 min-h-[300px] prose prose-sm max-w-none bg-white"
+        ></div>
+      </div>
+
+    </div>
+
+    <!-- ── Sidebar ────────────────────────────────────────────── -->
+    <aside class="flex flex-col gap-6">
+
+      <!-- Status indicator -->
+      <div class="bg-gray-50 border border-gray-200 rounded-md p-4">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estado</p>
+        <div id="status-badge" class={`inline-block text-xs font-medium px-2 py-1 rounded ${
+          report?.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+        }`}>
+          {report?.status === 'published' ? 'Publicado' : 'Borrador'}
+        </div>
+        <input type="hidden" id="status-input" name="status" value={report?.status ?? 'draft'} />
+      </div>
+
+      <!-- Category -->
+      <div>
+        <label for="category" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Categoría <span class="text-madrid-red">*</span>
+        </label>
+        <select
+          id="category"
+          name="category"
+          class="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
+        >
+          {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+            <option value={value} selected={report?.category === value}>{label}</option>
+          ))}
+        </select>
+      </div>
+
+      <!-- District -->
+      <div>
+        <label for="districtId" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Distrito
+        </label>
+        <select
+          id="districtId"
+          name="districtId"
+          class="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
+        >
+          <option value="">— Toda la ciudad —</option>
+          {districtList.map((d) => (
+            <option value={d.id} selected={report?.districtId === d.id}>{d.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <!-- Tags -->
+      <div>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Etiquetas</p>
+        <div class="grid grid-cols-2 gap-1.5">
+          {tagList.map((tag) => (
+            <label class="flex items-center gap-1.5 text-sm cursor-pointer group">
+              <input
+                type="checkbox"
+                name="tags"
+                value={tag.id}
+                checked={report?.tagIds?.includes(tag.id)}
+                class="accent-madrid-red"
+              />
+              <span class="text-gray-700 group-hover:text-madrid-red transition-colors">{tag.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <!-- Cover image -->
+      <div>
+        <label for="coverImage" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Imagen de portada (URL)
+        </label>
+        <input
+          id="coverImage"
+          name="coverImage"
+          type="url"
+          value={report?.coverImage ?? ''}
+          placeholder="https://..."
+          class="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
+        />
+        <div id="cover-preview" class="mt-2 hidden">
+          <img id="cover-img" src="" alt="Preview" class="w-full h-32 object-cover rounded-md" />
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- Error banner -->
+  <div id="error-banner" class="hidden mt-6 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700"></div>
+</form>
+
+<script define:vars={{ submitUrl, submitMethod, isEdit }}>
+  // ── Slug auto-generation ──────────────────────────────────────────────────
+  const titleEl = document.getElementById('title');
+  const slugEl = document.getElementById('slug');
+  let slugEdited = slugEl.value.length > 0 && isEdit;
+
+  function clientSlugify(text) {
+    return text.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .trim();
+  }
+
+  titleEl.addEventListener('input', () => {
+    if (!slugEdited) slugEl.value = clientSlugify(titleEl.value);
+  });
+  slugEl.addEventListener('input', () => { slugEdited = slugEl.value.length > 0; });
+
+  // ── Cover image preview ───────────────────────────────────────────────────
+  const coverInput = document.getElementById('coverImage');
+  const coverPreview = document.getElementById('cover-preview');
+  const coverImg = document.getElementById('cover-img');
+
+  function updateCoverPreview() {
+    const url = coverInput.value.trim();
+    if (url) { coverImg.src = url; coverPreview.classList.remove('hidden'); }
+    else { coverPreview.classList.add('hidden'); }
+  }
+  coverInput.addEventListener('input', updateCoverPreview);
+  updateCoverPreview();
+
+  // ── Write / Preview tabs ──────────────────────────────────────────────────
+  const tabWrite = document.getElementById('tab-write');
+  const tabPreview = document.getElementById('tab-preview');
+  const writePanel = document.getElementById('write-panel');
+  const previewPanel = document.getElementById('preview-panel');
+  const toolbar = document.getElementById('editor-toolbar');
+  const contentEl = document.getElementById('content');
+
+  const activeTab = 'border-b-2 border-madrid-red text-madrid-red';
+  const inactiveTab = 'border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+
+  tabWrite.addEventListener('click', () => {
+    tabWrite.className = `px-4 py-2 text-sm font-medium -mb-px ${activeTab}`;
+    tabPreview.className = `px-4 py-2 text-sm font-medium -mb-px ${inactiveTab}`;
+    writePanel.classList.remove('hidden');
+    previewPanel.classList.add('hidden');
+    toolbar.classList.remove('hidden');
+  });
+
+  tabPreview.addEventListener('click', () => {
+    tabPreview.className = `px-4 py-2 text-sm font-medium -mb-px ${activeTab}`;
+    tabWrite.className = `px-4 py-2 text-sm font-medium -mb-px ${inactiveTab}`;
+    previewPanel.classList.remove('hidden');
+    writePanel.classList.add('hidden');
+    toolbar.classList.add('hidden');
+    previewPanel.innerHTML = contentEl.value || '<p class="text-gray-400 italic">Sin contenido</p>';
+  });
+
+  // ── Toolbar formatting ────────────────────────────────────────────────────
+  document.querySelectorAll('.toolbar-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tag = btn.dataset.tag;
+      const close = btn.dataset.close;
+      const start = contentEl.selectionStart;
+      const end = contentEl.selectionEnd;
+      const selected = contentEl.value.substring(start, end);
+      const before = contentEl.value.substring(0, start);
+      const after = contentEl.value.substring(end);
+      contentEl.value = before + tag + selected + close + after;
+      contentEl.selectionStart = start + tag.length;
+      contentEl.selectionEnd = start + tag.length + selected.length;
+      contentEl.focus();
+    });
+  });
+
+  // ── Form submission ───────────────────────────────────────────────────────
+  const errorBanner = document.getElementById('error-banner');
+  const formStatus = document.getElementById('form-status');
+  const statusInput = document.getElementById('status-input');
+  const statusBadge = document.getElementById('status-badge');
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showStatus(msg) {
+    formStatus.textContent = msg;
+    formStatus.classList.remove('hidden');
+    setTimeout(() => formStatus.classList.add('hidden'), 3000);
+  }
+
+  async function submit(targetStatus) {
+    errorBanner.classList.add('hidden');
+    statusInput.value = targetStatus;
+
+    const title = document.getElementById('title').value.trim();
+    const summary = document.getElementById('summary').value.trim();
+    const content = contentEl.value.trim();
+
+    if (!title) return showError('El título es obligatorio.');
+    if (!summary) return showError('El resumen es obligatorio.');
+    if (!content) return showError('El contenido es obligatorio.');
+
+    const tags = [...document.querySelectorAll('input[name="tags"]:checked')].map(el => el.value);
+
+    const payload = {
+      title,
+      slug: slugEl.value.trim() || undefined,
+      summary,
+      content,
+      category: document.getElementById('category').value,
+      districtId: document.getElementById('districtId').value || null,
+      coverImage: document.getElementById('coverImage').value.trim() || null,
+      status: targetStatus,
+      tags,
+    };
+
+    const btn = targetStatus === 'published' ? document.getElementById('btn-publish') : document.getElementById('btn-draft');
+    const originalText = btn.textContent;
+    btn.textContent = 'Guardando…';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch(submitUrl, {
+        method: submitMethod,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        showError(data.error ?? `Error ${res.status}`);
+        return;
+      }
+
+      if (!isEdit) {
+        // After create, redirect to the edit page
+        window.location.href = `/admin/reports/${data.id}/edit`;
+      } else {
+        showStatus(targetStatus === 'published' ? '✓ Publicado' : '✓ Guardado');
+        // Update status badge
+        statusBadge.textContent = targetStatus === 'published' ? 'Publicado' : 'Borrador';
+        statusBadge.className = `inline-block text-xs font-medium px-2 py-1 rounded ${
+          targetStatus === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+        }`;
+        // Sync the publish button label
+        document.getElementById('btn-publish').textContent =
+          targetStatus === 'published' ? 'Actualizar' : 'Publicar';
+      }
+    } catch (err) {
+      showError('Error de red. Inténtalo de nuevo.');
+    } finally {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('btn-draft').addEventListener('click', () => submit('draft'));
+  document.getElementById('btn-publish').addEventListener('click', () => submit('published'));
+</script>
