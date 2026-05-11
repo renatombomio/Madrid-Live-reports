@@ -1,0 +1,92 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ReportCard from '../components/ReportCard.astro';
+import NewsCard from '../components/NewsCard.astro';
+import { db } from '../db';
+import { reports, news, user } from '../db/schema';
+import { eq, desc } from 'drizzle-orm';
+
+const [latestReports, latestNews] = await Promise.all([
+  db
+    .select({
+      id: reports.id,
+      title: reports.title,
+      slug: reports.slug,
+      summary: reports.summary,
+      category: reports.category,
+      coverImage: reports.coverImage,
+      publishedAt: reports.publishedAt,
+      authorName: user.name,
+    })
+    .from(reports)
+    .innerJoin(user, eq(reports.authorId, user.id))
+    .where(eq(reports.status, 'published'))
+    .orderBy(desc(reports.publishedAt))
+    .limit(6),
+
+  db
+    .select({
+      id: news.id,
+      title: news.title,
+      slug: news.slug,
+      summary: news.summary,
+      coverImage: news.coverImage,
+      publishedAt: news.publishedAt,
+      authorName: user.name,
+      source: news.source,
+    })
+    .from(news)
+    .innerJoin(user, eq(news.authorId, user.id))
+    .where(eq(news.status, 'published'))
+    .orderBy(desc(news.publishedAt))
+    .limit(5),
+]);
+---
+
+<BaseLayout title="Inicio">
+  <!-- Hero -->
+  <section class="text-center py-16 mb-12">
+    <h1 class="text-5xl font-bold mb-4">
+      Madrid en <span class="text-madrid-red">tiempo real</span>
+    </h1>
+    <p class="text-xl text-gray-600 max-w-2xl mx-auto">
+      Informes en profundidad, noticias de actualidad y análisis de la ciudad de Madrid.
+    </p>
+  </section>
+
+  <!-- Latest reports -->
+  <section class="mb-16">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold">Últimos informes</h2>
+      <a href="/reports" class="text-sm text-madrid-red hover:underline">Ver todos →</a>
+    </div>
+
+    {latestReports.length > 0 ? (
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {latestReports.map((report) => (
+          <ReportCard {...report} />
+        ))}
+      </div>
+    ) : (
+      <p class="text-gray-400 text-center py-12">No hay informes publicados todavía.</p>
+    )}
+  </section>
+
+  <!-- Latest news -->
+  <section>
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold">Últimas noticias</h2>
+      <a href="/news" class="text-sm text-madrid-red hover:underline">Ver todas →</a>
+    </div>
+
+    {latestNews.length > 0 ? (
+      <div class="flex flex-col gap-3 max-w-2xl">
+        {latestNews.map((item) => (
+          <NewsCard {...item} />
+        ))}
+      </div>
+    ) : (
+      <p class="text-gray-400 text-center py-12">No hay noticias publicadas todavía.</p>
+    )}
+  </section>
+</BaseLayout>

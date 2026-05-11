@@ -1,0 +1,58 @@
+---
+import type { User } from '../lib/auth';
+
+interface Props {
+  user?: User;
+}
+
+const { user } = Astro.props;
+---
+
+<header class="border-b border-gray-200 bg-white sticky top-0 z-50">
+  <nav class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <!-- Wordmark -->
+    <a href="/" class="flex items-center gap-2 no-underline">
+      <span class="w-3 h-8 bg-madrid-red rounded-sm"></span>
+      <span class="font-serif text-xl font-bold text-madrid-dark">Madrid Live</span>
+    </a>
+
+    <!-- Primary nav -->
+    <ul class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
+      <li><a href="/reports" class="hover:text-madrid-red transition-colors no-underline">Informes</a></li>
+      <li><a href="/news" class="hover:text-madrid-red transition-colors no-underline">Noticias</a></li>
+      <li><a href="/districts" class="hover:text-madrid-red transition-colors no-underline">Distritos</a></li>
+    </ul>
+
+    <!-- Auth -->
+    <div class="flex items-center gap-3">
+      {user ? (
+        <div class="flex items-center gap-3">
+          {(user.role === 'admin' || user.role === 'editor') && (
+            <a
+              href="/admin"
+              class="text-sm text-gray-600 hover:text-madrid-red transition-colors no-underline"
+            >
+              Admin
+            </a>
+          )}
+          <span class="text-sm text-gray-500">{user.name}</span>
+          <form method="POST" action="/api/auth/sign-out">
+            <button
+              type="submit"
+              class="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              Salir
+            </button>
+          </form>
+        </div>
+      ) : (
+        <a
+          href="/admin/login"
+          class="text-sm px-3 py-1.5 bg-madrid-red text-white rounded-md hover:bg-red-700 transition-colors no-underline"
+        >
+          Acceder
+        </a>
+      )}
+    </div>
+  </nav>
+</header>

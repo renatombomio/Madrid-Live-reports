@@ -1,0 +1,43 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  coverImage?: string | null;
+  publishedAt?: Date | null;
+  authorName: string;
+  source?: string | null;
+  districtName?: string | null;
+}
+
+const { title, slug, summary, coverImage, publishedAt, authorName, source, districtName } =
+  Astro.props;
+
+const date = publishedAt
+  ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' }).format(publishedAt)
+  : null;
+---
+
+<article class="flex gap-4 bg-white rounded-card border border-gray-100 p-4 hover:shadow-sm transition-shadow">
+  {coverImage && (
+    <img src={coverImage} alt={title} class="w-24 h-24 object-cover rounded-md flex-shrink-0" />
+  )}
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2 mb-1 text-xs text-gray-400">
+      {districtName && <span>{districtName}</span>}
+      {source && <span class="text-gray-300">·</span>}
+      {source && <span class="font-medium">{source}</span>}
+    </div>
+    <h3 class="font-medium text-madrid-dark leading-snug mb-1">
+      <a href={`/news/${slug}`} class="hover:text-madrid-red transition-colors no-underline">
+        {title}
+      </a>
+    </h3>
+    <p class="text-xs text-gray-500 line-clamp-2 mb-2">{summary}</p>
+    <div class="flex items-center justify-between text-xs text-gray-400">
+      <span>{authorName}</span>
+      {date && <time datetime={publishedAt?.toISOString()}>{date}</time>}
+    </div>
+  </div>
+</article>

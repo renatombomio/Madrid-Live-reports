@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+/* ─── Madrid brand tokens (Tailwind v4 CSS-first theme) ─────────────────────── */
+@theme {
+  --color-madrid-red: #c60b1e;
+  --color-madrid-yellow: #ffc400;
+  --color-madrid-gold: #b8860b;
+  --color-madrid-dark: #1a1a2e;
+  --color-madrid-surface: #f8f7f4;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+
+  --radius-card: 0.75rem;
+}
+
+/* ─── Base styles ───────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-madrid-dark);
+    background-color: var(--color-madrid-surface);
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-serif);
+  }
+
+  a {
+    color: var(--color-madrid-red);
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+}

@@ -1,0 +1,40 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ReportCard from '../../components/ReportCard.astro';
+import { db } from '../../db';
+import { reports, user, districts } from '../../db/schema';
+import { eq, desc } from 'drizzle-orm';
+
+const allReports = await db
+  .select({
+    id: reports.id,
+    title: reports.title,
+    slug: reports.slug,
+    summary: reports.summary,
+    category: reports.category,
+    coverImage: reports.coverImage,
+    publishedAt: reports.publishedAt,
+    authorName: user.name,
+    districtName: districts.name,
+  })
+  .from(reports)
+  .innerJoin(user, eq(reports.authorId, user.id))
+  .leftJoin(districts, eq(reports.districtId, districts.id))
+  .where(eq(reports.status, 'published'))
+  .orderBy(desc(reports.publishedAt));
+---
+
+<BaseLayout title="Informes" description="Análisis en profundidad sobre Madrid.">
+  <h1 class="text-4xl font-bold mb-2">Informes</h1>
+  <p class="text-gray-500 mb-10">Análisis en profundidad sobre la ciudad de Madrid.</p>
+
+  {allReports.length > 0 ? (
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {allReports.map((report) => (
+        <ReportCard {...report} />
+      ))}
+    </div>
+  ) : (
+    <p class="text-gray-400 text-center py-24">No hay informes publicados todavía.</p>
+  )}
+</BaseLayout>

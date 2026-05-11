@@ -1,0 +1,20 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="border-t border-gray-200 bg-white mt-16">
+  <div class="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-2">
+      <span class="w-2 h-6 bg-madrid-red rounded-sm"></span>
+      <span class="font-serif font-bold text-madrid-dark">Madrid Live Reports</span>
+    </div>
+
+    <nav class="flex gap-6 text-sm text-gray-500">
+      <a href="/reports" class="hover:text-madrid-red transition-colors no-underline">Informes</a>
+      <a href="/news" class="hover:text-madrid-red transition-colors no-underline">Noticias</a>
+      <a href="/districts" class="hover:text-madrid-red transition-colors no-underline">Distritos</a>
+    </nav>
+
+    <p class="text-xs text-gray-400">© {year} Madrid Live Reports</p>
+  </div>
+</footer>

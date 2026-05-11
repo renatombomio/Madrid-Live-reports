@@ -1,0 +1,38 @@
+---
+import ReportLayout from '../../layouts/ReportLayout.astro';
+import { db } from '../../db';
+import { reports, user, districts } from '../../db/schema';
+import { eq, and } from 'drizzle-orm';
+
+const { slug } = Astro.params;
+
+if (!slug) return Astro.redirect('/reports');
+
+const [result] = await db
+  .select({
+    id: reports.id,
+    title: reports.title,
+    slug: reports.slug,
+    summary: reports.summary,
+    content: reports.content,
+    coverImage: reports.coverImage,
+    status: reports.status,
+    category: reports.category,
+    districtId: reports.districtId,
+    authorId: reports.authorId,
+    publishedAt: reports.publishedAt,
+    createdAt: reports.createdAt,
+    updatedAt: reports.updatedAt,
+    authorName: user.name,
+    districtName: districts.name,
+  })
+  .from(reports)
+  .innerJoin(user, eq(reports.authorId, user.id))
+  .leftJoin(districts, eq(reports.districtId, districts.id))
+  .where(and(eq(reports.slug, slug), eq(reports.status, 'published')))
+  .limit(1);
+
+if (!result) return Astro.redirect('/reports', 307);
+---
+
+<ReportLayout report={result} />

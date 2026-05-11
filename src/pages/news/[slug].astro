@@ -1,0 +1,77 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { db } from '../../db';
+import { news, user, districts } from '../../db/schema';
+import { eq, and } from 'drizzle-orm';
+
+const { slug } = Astro.params;
+
+if (!slug) return Astro.redirect('/news');
+
+const [item] = await db
+  .select({
+    id: news.id,
+    title: news.title,
+    slug: news.slug,
+    summary: news.summary,
+    content: news.content,
+    coverImage: news.coverImage,
+    publishedAt: news.publishedAt,
+    source: news.source,
+    sourceUrl: news.sourceUrl,
+    authorName: user.name,
+    districtName: districts.name,
+  })
+  .from(news)
+  .innerJoin(user, eq(news.authorId, user.id))
+  .leftJoin(districts, eq(news.districtId, districts.id))
+  .where(and(eq(news.slug, slug), eq(news.status, 'published')))
+  .limit(1);
+
+if (!item) return Astro.redirect('/news', 307);
+
+const formattedDate = item.publishedAt
+  ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(item.publishedAt)
+  : null;
+---
+
+<BaseLayout title={item.title} description={item.summary} ogImage={item.coverImage ?? undefined}>
+  <article class="max-w-3xl mx-auto">
+    {item.coverImage && (
+      <img src={item.coverImage} alt={item.title} class="w-full h-64 object-cover rounded-card mb-8" />
+    )}
+
+    <header class="mb-8">
+      <div class="flex items-center gap-2 text-sm text-gray-500 mb-3">
+        {item.districtName && <span>{item.districtName}</span>}
+        {item.source && (
+          <>
+            <span class="text-gray-300">·</span>
+            <span>Fuente: {item.source}</span>
+          </>
+        )}
+        {formattedDate && (
+          <>
+            <span class="text-gray-300">·</span>
+            <time datetime={item.publishedAt?.toISOString()}>{formattedDate}</time>
+          </>
+        )}
+      </div>
+
+      <h1 class="text-4xl font-bold mb-4">{item.title}</h1>
+      <p class="text-xl text-gray-600">{item.summary}</p>
+      <p class="mt-3 text-sm text-gray-400">Por {item.authorName}</p>
+    </header>
+
+    <div class="prose prose-lg max-w-none" set:html={item.content} />
+
+    {item.sourceUrl && (
+      <div class="mt-8 p-4 bg-gray-50 rounded-md text-sm text-gray-500">
+        Fuente original:
+        <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer" class="ml-1">
+          {item.source ?? item.sourceUrl}
+        </a>
+      </div>
+    )}
+  </article>
+</BaseLayout>
