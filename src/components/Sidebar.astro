@@ -1,0 +1,64 @@
+---
+interface FeedItem { text: string; time: string; color: 'red'|'blue'|'amber'|'green'|'purple'; }
+interface AiInsight { label: string; value: string; sub?: string; }
+interface Props { feed?: FeedItem[]; insights?: AiInsight[]; }
+const { feed = [
+  { text: 'Corte Gran Vía confirmado por Ayuntamiento', time: 'Hace 5 min',  color: 'red'    },
+  { text: 'Metro L6: normalización prevista para las 20:00h', time: 'Hace 18 min', color: 'blue'   },
+  { text: 'Alerta meteorológica activa hasta las 21:00h', time: 'Hace 30 min', color: 'amber'  },
+  { text: 'Concierto gratuito en Retiro — 19:30h', time: 'Hace 1h',   color: 'purple' },
+  { text: 'BiciMAD: 98% de estaciones operativas', time: 'Hace 2h',   color: 'green'  },
+], insights = [
+  { label: 'Distrito más activo hoy', value: 'Centro — 12 reportes', sub: '+40% sobre media semanal' },
+  { label: 'Tendencia detectada',     value: 'Tráfico inusualmente alto', sub: 'Gran Vía, Sol, Callao' },
+  { label: 'Resumen del día',         value: 'Incidencias de transporte', sub: 'Metro + tráfico afectan Centro' },
+] } = Astro.props;
+---
+<aside class="sidebar" aria-label="Panel lateral">
+  <section class="sb-section">
+    <div class="sb-head syne">Feed en vivo</div>
+    <ol class="feed-list" aria-live="polite">
+      {feed.map(item => (
+        <li class="feed-item">
+          <span class={`feed-dot feed-dot--${item.color}`} aria-hidden="true"></span>
+          <div><p class="feed-text">{item.text}</p><time class="feed-time">{item.time}</time></div>
+        </li>
+      ))}
+    </ol>
+  </section>
+  <section class="sb-section">
+    <div class="sb-head syne">AI Insights <span class="ai-badge syne">Beta</span></div>
+    {insights.map(i => (
+      <div class="ai-card">
+        <p class="ai-label">{i.label}</p>
+        <p class="ai-value syne">{i.value}</p>
+        {i.sub && <p class="ai-sub">{i.sub}</p>}
+      </div>
+    ))}
+  </section>
+</aside>
+<style>
+  .sidebar { background: var(--bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+  .sb-section { border-bottom: 1px solid var(--border); }
+  .sb-section:last-child { border-bottom: none; }
+  .sb-head { display: flex; align-items: center; gap: 6px; padding: 0.875rem 1.25rem 0.5rem; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt3); }
+  .feed-list { list-style: none; }
+  .feed-item { display: flex; gap: 10px; align-items: flex-start; padding: 0.65rem 1.25rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-item:hover { background: var(--bg2); }
+  .feed-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .feed-dot--red    { background: var(--red); }
+  .feed-dot--blue   { background: var(--accent); }
+  .feed-dot--amber  { background: var(--amber); }
+  .feed-dot--green  { background: var(--green); }
+  .feed-dot--purple { background: var(--purple); }
+  .feed-text { font-size: 12px; color: var(--txt2); line-height: 1.5; margin-bottom: 2px; }
+  .feed-time { font-size: 10px; color: var(--txt3); display: block; }
+  .ai-badge { margin-left: auto; background: var(--accentbg); color: var(--accent); border: 1px solid var(--accentbd); border-radius: 4px; padding: 1px 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; }
+  .ai-card { padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .ai-card:last-child { border-bottom: none; }
+  .ai-card:hover { background: var(--bg2); }
+  .ai-label { font-size: 10px; color: var(--txt3); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 3px; }
+  .ai-value { font-size: 13px; font-weight: 700; color: var(--txt); margin-bottom: 2px; }
+  .ai-sub { font-size: 11px; color: var(--txt3); }
+</style>

@@ -1,0 +1,48 @@
+---
+interface District { name: string; slug: string; reportCount: number; latestActivity?: string; }
+interface Props { districts?: District[]; }
+const { districts = [
+  { name: 'Centro',      slug: 'centro',      reportCount: 12, latestActivity: 'Hace 5 min' },
+  { name: 'Chamberí',    slug: 'chamberi',    reportCount: 8,  latestActivity: 'Hace 1h' },
+  { name: 'Retiro',      slug: 'retiro',      reportCount: 7,  latestActivity: 'Hace 2h' },
+  { name: 'Tetuán',      slug: 'tetuan',      reportCount: 6,  latestActivity: 'Hace 3h' },
+  { name: 'Salamanca',   slug: 'salamanca',   reportCount: 5,  latestActivity: 'Hace 4h' },
+  { name: 'Moncloa',     slug: 'moncloa',     reportCount: 4,  latestActivity: 'Hace 12 min' },
+  { name: 'Carabanchel', slug: 'carabanchel', reportCount: 6,  latestActivity: 'Hace 1h' },
+  { name: 'Arganzuela',  slug: 'arganzuela',  reportCount: 4,  latestActivity: 'Hace 5h' },
+] } = Astro.props;
+const maxCount = Math.max(...districts.map(d => d.reportCount));
+---
+<section class="dg-section" aria-label="Explorar por distrito">
+  <div class="dg-header">
+    <span class="dg-title syne">Explorar por distrito</span>
+    <a href="/districts" class="dg-link">Ver mapa →</a>
+  </div>
+  <div class="dg-grid">
+    {districts.map(d => {
+      const pct = Math.round((d.reportCount / maxCount) * 100);
+      return (
+        <a href={`/districts/${d.slug}`} class="dg-card card-hover" aria-label={`${d.name}: ${d.reportCount} reportes`}>
+          <div class="dg-name syne">{d.name}</div>
+          <div class="dg-count">{d.reportCount} reportes</div>
+          <div class="dist-bar" aria-hidden="true"><div class="dist-bar-fill" style={`width:${pct}%`}></div></div>
+          {d.latestActivity && <div class="dg-time">{d.latestActivity}</div>}
+        </a>
+      );
+    })}
+  </div>
+</section>
+<style>
+  .dg-section { border-top: 1px solid var(--border); }
+  .dg-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem 0.75rem; }
+  .dg-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt2); }
+  .dg-link { font-size: 12px; color: var(--accent); text-decoration: none; }
+  .dg-link:hover { opacity: 0.75; }
+  .dg-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--border); border-top: 1px solid var(--border); }
+  .dg-card { background: var(--bg2); padding: 1rem 1.25rem; text-decoration: none; display: block; }
+  .dg-name { font-size: 13px; font-weight: 700; color: var(--txt); margin-bottom: 3px; transition: color 0.15s; }
+  .dg-card:hover .dg-name { color: var(--accent); }
+  .dg-count { font-size: 11px; color: var(--txt3); margin-bottom: 8px; }
+  .dg-time { font-size: 10px; color: var(--txt3); margin-top: 5px; }
+  @media (max-width: 768px) { .dg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>

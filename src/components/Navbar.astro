@@ -1,0 +1,59 @@
+---
+---
+<header class="navbar">
+  <div class="navbar__logo syne">MADRID<span>LIVE</span></div>
+  <nav class="navbar__links" aria-label="Navegación principal">
+    <a href="/reports">Reportes</a>
+    <a href="/districts">Distritos</a>
+    <a href="/news">Noticias</a>
+    <a href="/about">Datos</a>
+  </nav>
+  <div class="navbar__right">
+    <a href="/reports" class="navbar__cta">
+      Ver todos los reportes
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="M2.5 6h7M6 2.5l3.5 3.5L6 9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </a>
+    <div class="live-pill" aria-label="Plataforma en directo">
+      <span class="live-dot" aria-hidden="true"></span>
+      EN DIRECTO
+    </div>
+  </div>
+</header>
+
+<style>
+  .navbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 1.5rem; height: 56px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(12px);
+  }
+  .navbar__logo { font-size: 15px; font-weight: 800; letter-spacing: 0.05em; color: var(--txt); }
+  .navbar__logo span { color: var(--accent); }
+  .navbar__links { display: flex; gap: 1.75rem; }
+  .navbar__links a { font-size: 13px; color: var(--txt2); text-decoration: none; letter-spacing: 0.02em; transition: color 0.15s; }
+  .navbar__links a:hover { color: var(--txt); }
+  .navbar__right { display: flex; align-items: center; gap: 12px; }
+  .navbar__cta {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; color: var(--txt2); text-decoration: none;
+    border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 6px 12px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .navbar__cta:hover { color: var(--txt); border-color: var(--border3); }
+  .live-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--redbg); border: 1px solid var(--redbd);
+    border-radius: 20px; padding: 4px 10px;
+    font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 600;
+    color: var(--red); letter-spacing: 0.08em;
+  }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--red); animation: pulse 1.5s ease infinite; flex-shrink: 0;
+  }
+  @media (max-width: 640px) { .navbar__links, .navbar__cta { display: none; } }
+</style>

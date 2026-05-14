@@ -1,92 +1,101 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import ReportCard from '../components/ReportCard.astro';
-import NewsCard from '../components/NewsCard.astro';
-import { db } from '../db';
-import { reports, news, user } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import '../styles/dashboard.css';
+import Navbar         from '../components/Navbar.astro';
+import Ticker         from '../components/Ticker.astro';
+import Hero           from '../components/Hero.astro';
+import LiveCards      from '../components/LiveCards.astro';
+import ReportCard     from '../components/ReportCard.astro';
+import Sidebar        from '../components/Sidebar.astro';
+import DistrictsGrid  from '../components/DistrictsGrid.astro';
+import CategoriesGrid from '../components/CategoriesGrid.astro';
 
-const [latestReports, latestNews] = await Promise.all([
-  db
-    .select({
-      id: reports.id,
-      title: reports.title,
-      slug: reports.slug,
-      summary: reports.summary,
-      category: reports.category,
-      coverImage: reports.coverImage,
-      publishedAt: reports.publishedAt,
-      authorName: user.name,
-    })
-    .from(reports)
-    .innerJoin(user, eq(reports.authorId, user.id))
-    .where(eq(reports.status, 'published'))
-    .orderBy(desc(reports.publishedAt))
-    .limit(6),
+// TODO: reemplazar con queries reales de Drizzle cuando estés listo
+// import { db } from '../db';
+// import { reports } from '../db/schema';
+// import { desc, eq } from 'drizzle-orm';
+// const featuredReports = await db.select().from(reports).where(eq(reports.published, true)).orderBy(desc(reports.createdAt)).limit(3);
 
-  db
-    .select({
-      id: news.id,
-      title: news.title,
-      slug: news.slug,
-      summary: news.summary,
-      coverImage: news.coverImage,
-      publishedAt: news.publishedAt,
-      authorName: user.name,
-      source: news.source,
-    })
-    .from(news)
-    .innerJoin(user, eq(news.authorId, user.id))
-    .where(eq(news.status, 'published'))
-    .orderBy(desc(news.publishedAt))
-    .limit(5),
-]);
+const featuredReports = [
+  {
+    title: 'Corte total en Gran Vía por obras de emergencia en red de saneamiento',
+    excerpt: 'El Ayuntamiento ha ordenado el cierre del tramo central entre Montera y Alcalá hasta nuevo aviso. Desvíos activos en líneas 001, 002 y 146.',
+    slug: 'corte-gran-via-obras-emergencia',
+    district: 'Centro',
+    tags: ['Urgente', 'Tráfico'],
+    publishedAt: new Date(Date.now() - 5 * 60000),
+    views: 1240,
+  },
+  {
+    title: 'Feria de San Isidro: programa completo y accesos recomendados este fin de semana',
+    excerpt: 'Más de 40.000 visitantes esperados. Acceso norte habilitado, recomendable usar transporte público.',
+    slug: 'feria-san-isidro-accesos',
+    district: 'Carabanchel',
+    tags: ['Cultura'],
+    publishedAt: new Date(Date.now() - 60 * 60000),
+    views: 3400,
+  },
+  {
+    title: 'Nuevos carriles bici en Paseo de la Castellana — apertura el próximo lunes',
+    excerpt: 'El Ayuntamiento inaugura 3,2 km de carril bici segregado entre Glorieta de Lima y Plaza Castilla.',
+    slug: 'carriles-bici-castellana',
+    district: 'Chamartín',
+    tags: ['Obras'],
+    publishedAt: new Date(Date.now() - 120 * 60000),
+    views: 890,
+  },
+];
 ---
-
-<BaseLayout title="Inicio">
-  <!-- Hero -->
-  <section class="text-center py-16 mb-12">
-    <h1 class="text-5xl font-bold mb-4">
-      Madrid en <span class="text-madrid-red">tiempo real</span>
-    </h1>
-    <p class="text-xl text-gray-600 max-w-2xl mx-auto">
-      Informes en profundidad, noticias de actualidad y análisis de la ciudad de Madrid.
-    </p>
-  </section>
-
-  <!-- Latest reports -->
-  <section class="mb-16">
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-2xl font-bold">Últimos informes</h2>
-      <a href="/reports" class="text-sm text-madrid-red hover:underline">Ver todos →</a>
-    </div>
-
-    {latestReports.length > 0 ? (
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {latestReports.map((report) => (
-          <ReportCard {...report} />
-        ))}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Madrid Live Reports — Plataforma de inteligencia urbana en tiempo real." />
+  <title>Madrid Live Reports — Urban Intelligence Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <Navbar />
+  <Ticker />
+  <Hero totalReports={147} totalDistricts={21} activeReports={3} />
+  <LiveCards />
+  <div style="height:1px;background:var(--border)"></div>
+  <div class="main-grid">
+    <section aria-label="Reportes destacados">
+      <div class="col-header">
+        <span class="col-title syne">Reportes destacados</span>
+        <a href="/reports" class="col-link">Ver todos →</a>
       </div>
-    ) : (
-      <p class="text-gray-400 text-center py-12">No hay informes publicados todavía.</p>
-    )}
-  </section>
-
-  <!-- Latest news -->
-  <section>
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-2xl font-bold">Últimas noticias</h2>
-      <a href="/news" class="text-sm text-madrid-red hover:underline">Ver todas →</a>
+      {featuredReports.map(r => <ReportCard {...r} />)}
+    </section>
+    <Sidebar />
+  </div>
+  <DistrictsGrid />
+  <CategoriesGrid />
+  <footer class="footer">
+    <div class="footer__logo syne">MADRID<span>LIVE</span></div>
+    <p class="footer__text">Plataforma de inteligencia urbana · Madrid, España</p>
+    <div class="footer__links">
+      <a href="/about">Acerca de</a>
+      <a href="/admin/login">Admin</a>
     </div>
-
-    {latestNews.length > 0 ? (
-      <div class="flex flex-col gap-3 max-w-2xl">
-        {latestNews.map((item) => (
-          <NewsCard {...item} />
-        ))}
-      </div>
-    ) : (
-      <p class="text-gray-400 text-center py-12">No hay noticias publicadas todavía.</p>
-    )}
-  </section>
-</BaseLayout>
+  </footer>
+</body>
+</html>
+<style>
+  .main-grid { display: grid; grid-template-columns: 1fr 280px; border-top: 1px solid var(--border); }
+  .col-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem 0.5rem; border-bottom: 1px solid var(--border); }
+  .col-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt2); }
+  .col-link { font-size: 12px; color: var(--accent); text-decoration: none; }
+  .col-link:hover { opacity: 0.75; }
+  .footer { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 0.75rem; }
+  .footer__logo { font-size: 14px; font-weight: 800; letter-spacing: 0.05em; color: var(--txt2); font-family: 'Syne', sans-serif; }
+  .footer__logo span { color: var(--accent); }
+  .footer__text { font-size: 11px; color: var(--txt3); }
+  .footer__links { display: flex; gap: 1.25rem; }
+  .footer__links a { font-size: 11px; color: var(--txt3); text-decoration: none; }
+  .footer__links a:hover { color: var(--txt2); }
+  @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+</style>

@@ -1,0 +1,44 @@
+---
+interface Props { items?: string[]; }
+const { items = [
+  "Corte Gran Vía — obras de emergencia",
+  "Metro L6 retrasos hasta 8 min",
+  "San Isidro: 40.000 visitantes previstos",
+  "Alerta calor: 34°C en Centro",
+  "Castellana: carril bici nuevo desde lunes",
+  "Manifestación en Sol — 18:00h",
+] } = Astro.props;
+const doubled = [...items, ...items];
+---
+<div class="ticker" role="marquee" aria-label="Últimas noticias en directo">
+  <div class="ticker__label">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg>
+    Última hora
+  </div>
+  <div class="ticker__track" aria-hidden="true">
+    <div class="ticker__items">
+      {doubled.map((item, i) => (
+        <Fragment>
+          <span class="ticker__item">{item}</span>
+          {i < doubled.length - 1 && <span class="ticker__sep">/</span>}
+        </Fragment>
+      ))}
+    </div>
+  </div>
+</div>
+
+<style>
+  .ticker { display: flex; align-items: center; height: 36px; border-bottom: 1px solid var(--border); background: var(--bg2); overflow: hidden; }
+  .ticker__label {
+    flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+    padding: 0 1rem; height: 100%;
+    font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
+    border-right: 1px solid var(--border2); white-space: nowrap;
+  }
+  .ticker__track { flex: 1; overflow: hidden; height: 100%; display: flex; align-items: center; }
+  .ticker__items { display: flex; gap: 1.5rem; white-space: nowrap; animation: ticker 28s linear infinite; }
+  .ticker__track:hover .ticker__items { animation-play-state: paused; }
+  .ticker__item { font-size: 12px; color: var(--txt2); }
+  .ticker__sep  { font-size: 12px; color: var(--border3); }
+</style>

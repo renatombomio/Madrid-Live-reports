@@ -1,0 +1,58 @@
+---
+interface LiveCard { category: string; title: string; district: string; time: string; }
+interface Props { cards?: LiveCard[]; }
+const { cards = [
+  { category: 'alert',   title: 'Gran Vía cortada entre Montera y Alcalá — obras emergencia', district: 'Centro',      time: 'Hace 5 min' },
+  { category: 'metro',   title: 'L6 — retrasos hasta 8 min en hora punta',                   district: 'Moncloa',     time: 'Hace 12 min' },
+  { category: 'culture', title: 'San Isidro: acceso norte La Pradera abierto',               district: 'Carabanchel', time: 'Hace 1h' },
+  { category: 'weather', title: 'Temperatura máxima 34°C — evitar zonas sin sombra',         district: 'Ciudad',      time: 'Hace 30 min' },
+] } = Astro.props;
+const meta: Record<string, { label: string; accent: string }> = {
+  metro:   { label: 'Metro',    accent: 'blue'   },
+  traffic: { label: 'Tráfico',  accent: 'amber'  },
+  culture: { label: 'Cultura',  accent: 'purple' },
+  alert:   { label: 'Urgente',  accent: 'red'    },
+  weather: { label: 'Clima',    accent: 'amber'  },
+  safety:  { label: 'Seguridad',accent: 'red'    },
+};
+---
+<section class="lc-section" aria-label="Alertas activas">
+  <div class="lc-header">
+    <span class="lc-title syne"><span class="lc-dot" aria-hidden="true"></span>Alertas activas</span>
+    <a href="/reports" class="lc-link">Ver todas →</a>
+  </div>
+  <div class="lc-grid">
+    {cards.map((card) => {
+      const m = meta[card.category] ?? meta.alert;
+      return (
+        <article class={`lc-card card-hover`} tabindex="0">
+          <div class={`lc-card__line accent-top-${m.accent}`}></div>
+          <div class={`lc-card__cat lc-cat--${m.accent} syne`}>{m.label}</div>
+          <p class="lc-card__title">{card.title}</p>
+          <div class="lc-card__meta"><span class="lc-live-dot" aria-hidden="true"></span>{card.time} · {card.district}</div>
+        </article>
+      );
+    })}
+  </div>
+</section>
+<style>
+  .lc-section { padding: 0 1.5rem 1.5rem; }
+  .lc-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 0 0.75rem; }
+  .lc-title { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt2); }
+  .lc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); animation: pulse 1.5s ease infinite; display: inline-block; }
+  .lc-link { font-size: 12px; color: var(--accent); text-decoration: none; }
+  .lc-link:hover { opacity: 0.75; }
+  .lc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .lc-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; cursor: pointer; position: relative; overflow: hidden; }
+  .lc-card__line { position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .lc-card__cat { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .lc-cat--blue   { color: var(--accent); }
+  .lc-cat--amber  { color: var(--amber); }
+  .lc-cat--purple { color: var(--purple); }
+  .lc-cat--red    { color: var(--red); }
+  .lc-card__title { font-size: 13px; font-weight: 500; line-height: 1.45; color: var(--txt); margin-bottom: 0.6rem; }
+  .lc-card__meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--txt3); }
+  .lc-live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); display: inline-block; flex-shrink: 0; }
+  @media (max-width: 768px) { .lc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 480px) { .lc-grid { grid-template-columns: 1fr; } }
+</style>

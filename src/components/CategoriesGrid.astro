@@ -1,0 +1,49 @@
+---
+interface Category { name: string; slug: string; count: number; color: string; }
+interface Props { categories?: Category[]; }
+const { categories = [
+  { name: 'Transporte',     slug: 'transporte',    count: 48, color: '#3b82f6' },
+  { name: 'Cultura',        slug: 'cultura',       count: 31, color: '#8b5cf6' },
+  { name: 'Seguridad',      slug: 'seguridad',     count: 19, color: '#ef4444' },
+  { name: 'Medio ambiente', slug: 'medio-ambiente',count: 14, color: '#10b981' },
+  { name: 'Obras',          slug: 'obras',         count: 22, color: '#f59e0b' },
+  { name: 'Salud',          slug: 'salud',         count: 8,  color: '#ec4899' },
+  { name: 'Economía',       slug: 'economia',      count: 11, color: '#06b6d4' },
+  { name: 'Educación',      slug: 'educacion',     count: 6,  color: '#84cc16' },
+] } = Astro.props;
+const icons: Record<string,string> = {
+  transporte:    `<rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>`,
+  cultura:       `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,
+  seguridad:     `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>`,
+  'medio-ambiente': `<path d="M12 22V12M12 12C12 7 7 4 2 6c0 6 4 10 10 6M12 12c0-5 5-8 10-6 0 6-4 10-10 6"/>`,
+  obras:         `<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>`,
+  salud:         `<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>`,
+  economia:      `<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+  educacion:     `<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>`,
+};
+---
+<section class="cg-section" aria-label="Categorías de reportes">
+  <div class="cg-header">
+    <span class="cg-title syne">Categorías</span>
+  </div>
+  <div class="cg-grid">
+    {categories.map(cat => (
+      <a href={`/reports?category=${cat.slug}`} class="cg-card card-hover" aria-label={`${cat.name}: ${cat.count} reportes`}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={cat.color} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={icons[cat.slug] ?? icons.obras} />
+        <div class="cg-name syne">{cat.name}</div>
+        <div class="cg-count">{cat.count} reportes</div>
+      </a>
+    ))}
+  </div>
+</section>
+<style>
+  .cg-section { border-top: 1px solid var(--border); }
+  .cg-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem 0.75rem; }
+  .cg-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt2); }
+  .cg-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0 1.5rem 1.5rem; }
+  .cg-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; text-decoration: none; display: flex; flex-direction: column; gap: 8px; }
+  .cg-name { font-size: 12px; font-weight: 700; color: var(--txt); line-height: 1.3; transition: color 0.15s; }
+  .cg-card:hover .cg-name { color: var(--accent); }
+  .cg-count { font-size: 11px; color: var(--txt3); }
+  @media (max-width: 768px) { .cg-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
