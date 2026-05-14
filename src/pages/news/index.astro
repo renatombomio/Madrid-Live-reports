@@ -1,6 +1,7 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
+import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
 import NewsCard from '../../components/NewsCard.astro';
+import Sidebar from '../../components/Sidebar.astro';
 import { db } from '../../db';
 import { news, user, districts } from '../../db/schema';
 import { eq, desc } from 'drizzle-orm';
@@ -24,17 +25,70 @@ const allNews = await db
   .orderBy(desc(news.publishedAt));
 ---
 
-<BaseLayout title="Noticias" description="Últimas noticias de Madrid.">
-  <h1 class="text-4xl font-bold mb-2">Noticias</h1>
-  <p class="text-gray-500 mb-10">Últimas noticias de la ciudad de Madrid.</p>
+<PublicDashboardLayout title="Noticias" description="Últimas noticias de Madrid.">
+  <div class="news-layout">
+    <main class="news-main">
+      <div class="page-head">
+        <h1 class="page-title syne">Noticias</h1>
+        <span class="page-count">{allNews.length} publicadas</span>
+      </div>
 
-  {allNews.length > 0 ? (
-    <div class="flex flex-col gap-3 max-w-2xl">
-      {allNews.map((item) => (
-        <NewsCard {...item} />
-      ))}
-    </div>
-  ) : (
-    <p class="text-gray-400 text-center py-24">No hay noticias publicadas todavía.</p>
-  )}
-</BaseLayout>
+      {allNews.length > 0 ? (
+        <div class="news-list">
+          {allNews.map((item) => (
+            <NewsCard {...item} />
+          ))}
+        </div>
+      ) : (
+        <div class="empty-state">
+          <p>No hay noticias publicadas todavía.</p>
+        </div>
+      )}
+    </main>
+    <Sidebar />
+  </div>
+</PublicDashboardLayout>
+
+<style>
+  .news-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    border-top: 1px solid var(--border);
+    min-height: 60vh;
+  }
+  .news-main {
+    border-right: 1px solid var(--border);
+  }
+  .page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--txt2);
+  }
+  .page-count {
+    font-size: 11px;
+    color: var(--txt3);
+  }
+  .news-list { display: flex; flex-direction: column; }
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6rem 1.5rem;
+    color: var(--txt3);
+    font-size: 14px;
+  }
+  @media (max-width: 900px) {
+    .news-layout { grid-template-columns: 1fr; }
+    .news-main { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>

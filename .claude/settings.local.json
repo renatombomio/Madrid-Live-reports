@@ -24,7 +24,21 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4321/news)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:4321/admin/login)",
       "Bash(curl *)",
-      "Bash(node_modules/.bin/tsx *)"
+      "Bash(node_modules/.bin/tsx *)",
+      "Bash(git push *)",
+      "Read(//Users/renato/**)",
+      "Bash(ssh -T git@github.com)",
+      "Bash(ssh-keygen *)",
+      "Bash(git remote *)",
+      "Bash(pnpm test *)",
+      "Bash(grep -v \"^$\")",
+      "Bash(cp ~/Downloads/dashboard.css src/styles/dashboard.css)",
+      "Bash(cp ~/Downloads/Navbar.astro src/components/Navbar.astro)",
+      "Bash(cp ~/Downloads/Ticker.astro src/components/Ticker.astro)",
+      "Bash(cp ~/Downloads/Hero.astro src/components/Hero.astro)",
+      "Bash(cp ~/Downloads/LiveCards.astro src/components/LiveCards.astro)",
+      "Bash(grep -E \"\\\\.\\(astro|css\\)$\")",
+      "Read(//tmp/**)"
     ]
   }
 }

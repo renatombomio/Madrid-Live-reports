@@ -1,0 +1,71 @@
+---
+import '../styles/dashboard.css';
+import Navbar from '../components/Navbar.astro';
+import Ticker from '../components/Ticker.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  ogImage?: string;
+  showTicker?: boolean;
+}
+
+const {
+  title,
+  description = 'Madrid Live Reports — Plataforma de inteligencia urbana en tiempo real.',
+  ogImage,
+  showTicker = true,
+} = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content={description} />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  {ogImage && <meta property="og:image" content={ogImage} />}
+  <title>{title} — Madrid Live Reports</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <Navbar />
+  {showTicker && <Ticker />}
+  <slot />
+  <footer class="dash-footer">
+    <div class="dash-footer__logo syne">MADRID<span>LIVE</span></div>
+    <p class="dash-footer__text">Plataforma de inteligencia urbana · Madrid, España</p>
+    <div class="dash-footer__links">
+      <a href="/about">Acerca de</a>
+      <a href="/admin/login">Admin</a>
+    </div>
+  </footer>
+</body>
+</html>
+
+<style>
+  .dash-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .dash-footer__logo {
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: var(--txt2);
+    font-family: 'Syne', sans-serif;
+  }
+  .dash-footer__logo span { color: var(--accent); }
+  .dash-footer__text { font-size: 11px; color: var(--txt3); }
+  .dash-footer__links { display: flex; gap: 1.25rem; }
+  .dash-footer__links a { font-size: 11px; color: var(--txt3); text-decoration: none; }
+  .dash-footer__links a:hover { color: var(--txt2); }
+</style>

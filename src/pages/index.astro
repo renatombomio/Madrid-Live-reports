@@ -1,7 +1,5 @@
 ---
-import '../styles/dashboard.css';
-import Navbar         from '../components/Navbar.astro';
-import Ticker         from '../components/Ticker.astro';
+import PublicDashboardLayout from '../layouts/PublicDashboardLayout.astro';
 import Hero           from '../components/Hero.astro';
 import LiveCards      from '../components/LiveCards.astro';
 import ReportCard     from '../components/ReportCard.astro';
@@ -45,23 +43,13 @@ const featuredReports = [
   },
 ];
 ---
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Madrid Live Reports — Plataforma de inteligencia urbana en tiempo real." />
-  <title>Madrid Live Reports — Urban Intelligence Platform</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
-</head>
-<body>
-  <Navbar />
-  <Ticker />
+<PublicDashboardLayout
+  title="Madrid Live Reports — Urban Intelligence Platform"
+  description="Madrid Live Reports — Plataforma de inteligencia urbana en tiempo real."
+>
   <Hero totalReports={147} totalDistricts={21} activeReports={3} />
   <LiveCards />
-  <div style="height:1px;background:var(--border)"></div>
+  <div class="section-divider" aria-hidden="true"></div>
   <div class="main-grid">
     <section aria-label="Reportes destacados">
       <div class="col-header">
@@ -74,28 +62,14 @@ const featuredReports = [
   </div>
   <DistrictsGrid />
   <CategoriesGrid />
-  <footer class="footer">
-    <div class="footer__logo syne">MADRID<span>LIVE</span></div>
-    <p class="footer__text">Plataforma de inteligencia urbana · Madrid, España</p>
-    <div class="footer__links">
-      <a href="/about">Acerca de</a>
-      <a href="/admin/login">Admin</a>
-    </div>
-  </footer>
-</body>
-</html>
+</PublicDashboardLayout>
+
 <style>
+  .section-divider { height: 1px; background: var(--border); }
   .main-grid { display: grid; grid-template-columns: 1fr 280px; border-top: 1px solid var(--border); }
   .col-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem 0.5rem; border-bottom: 1px solid var(--border); }
   .col-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt2); }
   .col-link { font-size: 12px; color: var(--accent); text-decoration: none; }
   .col-link:hover { opacity: 0.75; }
-  .footer { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-top: 1px solid var(--border); flex-wrap: wrap; gap: 0.75rem; }
-  .footer__logo { font-size: 14px; font-weight: 800; letter-spacing: 0.05em; color: var(--txt2); font-family: 'Syne', sans-serif; }
-  .footer__logo span { color: var(--accent); }
-  .footer__text { font-size: 11px; color: var(--txt3); }
-  .footer__links { display: flex; gap: 1.25rem; }
-  .footer__links a { font-size: 11px; color: var(--txt3); text-decoration: none; }
-  .footer__links a:hover { color: var(--txt2); }
   @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
 </style>

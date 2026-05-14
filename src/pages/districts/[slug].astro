@@ -1,0 +1,129 @@
+---
+import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
+import ReportCard from '../../components/ReportCard.astro';
+import Sidebar from '../../components/Sidebar.astro';
+import { db } from '../../db';
+import { districts, reports, user } from '../../db/schema';
+import { eq, and, desc } from 'drizzle-orm';
+
+const { slug } = Astro.params;
+
+if (!slug) return Astro.redirect('/districts');
+
+const [district] = await db
+  .select()
+  .from(districts)
+  .where(eq(districts.slug, slug))
+  .limit(1);
+
+if (!district) return Astro.redirect('/districts', 307);
+
+const districtReports = await db
+  .select({
+    id: reports.id,
+    title: reports.title,
+    slug: reports.slug,
+    summary: reports.summary,
+    publishedAt: reports.publishedAt,
+    authorName: user.name,
+  })
+  .from(reports)
+  .innerJoin(user, eq(reports.authorId, user.id))
+  .where(and(eq(reports.districtId, district.id), eq(reports.status, 'published')))
+  .orderBy(desc(reports.publishedAt));
+---
+
+<PublicDashboardLayout
+  title={`${district.name} — Distritos`}
+  description={district.description ?? `Reportes publicados en el distrito ${district.name}.`}
+  showTicker={false}
+>
+  <div class="district-layout">
+    <main class="district-main">
+      <div class="breadcrumb">
+        <a href="/districts" class="breadcrumb__back">← Distritos</a>
+      </div>
+      <div class="district-head">
+        <h1 class="district-name syne">{district.name}</h1>
+        {district.description && <p class="district-desc">{district.description}</p>}
+        <span class="district-count">{districtReports.length} {districtReports.length === 1 ? 'reporte' : 'reportes'} publicados</span>
+      </div>
+
+      {districtReports.length > 0 ? (
+        <div class="reports-list">
+          {districtReports.map(r => (
+            <ReportCard
+              title={r.title}
+              excerpt={r.summary}
+              slug={r.slug}
+              district={district.name}
+              publishedAt={r.publishedAt ?? undefined}
+            />
+          ))}
+        </div>
+      ) : (
+        <div class="empty-state">
+          <p>No hay reportes publicados en este distrito todavía.</p>
+        </div>
+      )}
+    </main>
+    <Sidebar />
+  </div>
+</PublicDashboardLayout>
+
+<style>
+  .district-layout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    border-top: 1px solid var(--border);
+    min-height: 60vh;
+  }
+  .district-main { border-right: 1px solid var(--border); }
+  .breadcrumb {
+    padding: 1rem 1.5rem 0;
+  }
+  .breadcrumb__back {
+    font-size: 12px;
+    color: var(--txt3);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .breadcrumb__back:hover { color: var(--accent); }
+  .district-head {
+    padding: 1rem 1.5rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .district-name {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(20px, 3vw, 28px);
+    font-weight: 800;
+    color: var(--txt);
+    letter-spacing: -0.3px;
+  }
+  .district-desc {
+    font-size: 13px;
+    color: var(--txt3);
+    line-height: 1.6;
+  }
+  .district-count {
+    font-size: 11px;
+    color: var(--txt3);
+    margin-top: 0.25rem;
+  }
+  .reports-list { display: flex; flex-direction: column; }
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6rem 1.5rem;
+    color: var(--txt3);
+    font-size: 14px;
+  }
+  @media (max-width: 900px) {
+    .district-layout { grid-template-columns: 1fr; }
+    .district-main { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
