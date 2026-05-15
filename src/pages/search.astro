@@ -1,0 +1,251 @@
+---
+import PublicDashboardLayout from '../layouts/PublicDashboardLayout.astro';
+import ReportCard from '../components/ReportCard.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { db } from '../db';
+import { reports, news, districts } from '../db/schema';
+import { eq, desc, or, ilike, and } from 'drizzle-orm';
+
+const q = (Astro.url.searchParams.get('q') ?? '').trim();
+
+function fmtRelative(d: Date | string | null | undefined): string {
+  if (!d) return '';
+  const date = typeof d === 'string' ? new Date(d) : d;
+  const diff = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (diff < 1)    return 'Ahora mismo';
+  if (diff < 60)   return `Hace ${diff}m`;
+  if (diff < 1440) return `Hace ${Math.floor(diff / 60)}h`;
+  return `Hace ${Math.floor(diff / 1440)}d`;
+}
+
+const CATEGORY_DISPLAY: Record<string, string> = {
+  urban_development: 'Urbanismo',
+  transport:         'Transporte',
+  culture:           'Cultura',
+  environment:       'Medio ambiente',
+  economy:           'Economía',
+  safety:            'Seguridad',
+  health:            'Salud',
+  education:         'Educación',
+  tourism:           'Turismo',
+  general:           'General',
+};
+
+let reportResults: Array<{
+  title: string; slug: string; summary: string;
+  districtName: string | null; publishedAt: Date | null; category: string;
+}> = [];
+let newsResults: Array<{
+  title: string; slug: string; summary: string;
+  source: string | null; publishedAt: Date | null;
+}> = [];
+
+if (q.length >= 2) {
+  const pattern = `%${q}%`;
+  [reportResults, newsResults] = await Promise.all([
+    db.select({
+      title:        reports.title,
+      slug:         reports.slug,
+      summary:      reports.summary,
+      districtName: districts.name,
+      publishedAt:  reports.publishedAt,
+      category:     reports.category,
+    })
+    .from(reports)
+    .leftJoin(districts, eq(reports.districtId, districts.id))
+    .where(and(
+      eq(reports.status, 'published'),
+      or(ilike(reports.title, pattern), ilike(reports.summary, pattern)),
+    ))
+    .orderBy(desc(reports.publishedAt))
+    .limit(20),
+
+    db.select({
+      title:       news.title,
+      slug:        news.slug,
+      summary:     news.summary,
+      source:      news.source,
+      publishedAt: news.publishedAt,
+    })
+    .from(news)
+    .where(and(
+      eq(news.status, 'published'),
+      or(ilike(news.title, pattern), ilike(news.summary, pattern)),
+    ))
+    .orderBy(desc(news.publishedAt))
+    .limit(10),
+  ]);
+}
+
+const totalResults = reportResults.length + newsResults.length;
+---
+
+<PublicDashboardLayout
+  title={q ? `Búsqueda: ${q} — Madrid Live Reports` : 'Buscar — Madrid Live Reports'}
+  description="Busca reportes y noticias sobre Madrid."
+  showTicker={false}
+>
+  <div class="search-hero">
+    <div class="search-hero__inner">
+      <div class="search-label syne">Búsqueda</div>
+      <form method="get" action="/search" class="search-form" role="search">
+        <label for="search-input" class="sr-only">Buscar reportes y noticias</label>
+        <div class="search-wrap">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            id="search-input"
+            class="search-input"
+            type="search"
+            name="q"
+            value={q}
+            placeholder="Buscar reportes, noticias, distritos…"
+            autocomplete="off"
+            autofocus
+          />
+          <button type="submit" class="search-btn syne">Buscar</button>
+        </div>
+      </form>
+      {q && (
+        <p class="search-meta">
+          {totalResults > 0
+            ? <>{totalResults} resultado{totalResults !== 1 ? 's' : ''} para <strong>"{q}"</strong></>
+            : <>Sin resultados para <strong>"{q}"</strong></>
+          }
+        </p>
+      )}
+    </div>
+  </div>
+
+  <div class="results-wrap">
+    {q.length < 2 && (
+      <EmptyState
+        icon="search"
+        title="Escribe para buscar"
+        message="Introduce al menos 2 caracteres para buscar entre reportes y noticias."
+      />
+    )}
+
+    {q.length >= 2 && totalResults === 0 && (
+      <EmptyState
+        icon="search"
+        title="Sin resultados"
+        message={`No encontramos reportes ni noticias que coincidan con "${q}". Prueba con otros términos.`}
+      />
+    )}
+
+    {reportResults.length > 0 && (
+      <section class="results-section">
+        <div class="results-section__head">
+          <span class="results-section__title syne">Reportes</span>
+          <span class="results-section__count">{reportResults.length}</span>
+        </div>
+        {reportResults.map(r => (
+          <ReportCard
+            title={r.title}
+            slug={r.slug}
+            excerpt={r.summary}
+            district={r.districtName ?? undefined}
+            publishedAt={r.publishedAt ?? undefined}
+            tags={[CATEGORY_DISPLAY[r.category] ?? r.category]}
+          />
+        ))}
+      </section>
+    )}
+
+    {newsResults.length > 0 && (
+      <section class="results-section">
+        <div class="results-section__head">
+          <span class="results-section__title syne">Noticias</span>
+          <span class="results-section__count">{newsResults.length}</span>
+        </div>
+        {newsResults.map(n => (
+          <article class="news-result card-hover">
+            <div class="news-result__meta">
+              {n.source && <span class="news-result__source">{n.source}</span>}
+              {n.publishedAt && <time class="news-result__time">{fmtRelative(n.publishedAt)}</time>}
+            </div>
+            <a href={`/news/${n.slug}`} class="news-result__title">{n.title}</a>
+            <p class="news-result__summary">{n.summary}</p>
+          </article>
+        ))}
+      </section>
+    )}
+  </div>
+</PublicDashboardLayout>
+
+<style>
+  .search-hero {
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 1.5rem 2rem;
+    background: var(--bg2);
+  }
+  .search-hero__inner { max-width: 640px; }
+  .search-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--txt3); margin-bottom: 1rem;
+  }
+  .search-form { margin-bottom: 0.75rem; }
+  .search-wrap { position: relative; display: flex; align-items: center; gap: 8px; }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--txt3); pointer-events: none; }
+  .search-input {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 11px 12px 11px 38px;
+    font-size: 14px; font-family: 'Inter', sans-serif; color: var(--txt);
+    outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow-sm);
+  }
+  .search-input::placeholder { color: var(--txt3); }
+  .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accentbg); }
+  .search-btn {
+    background: var(--accent); color: #fff;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+    padding: 11px 20px; border-radius: var(--radius-sm); border: none;
+    cursor: pointer; white-space: nowrap; transition: opacity 0.15s;
+    box-shadow: var(--shadow-sm);
+  }
+  .search-btn:hover { opacity: 0.85; }
+  .search-meta { font-size: 13px; color: var(--txt3); margin-top: 0.5rem; }
+  .search-meta strong { color: var(--txt2); font-weight: 500; }
+
+  .results-wrap { max-width: 800px; padding: 0 1.5rem 3rem; margin: 0 auto; }
+
+  .results-section { margin-top: 2rem; }
+  .results-section__head {
+    display: flex; align-items: center; gap: 10px;
+    padding-bottom: 0.75rem; margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .results-section__title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt2); }
+  .results-section__count {
+    font-size: 10px; font-weight: 700; color: var(--accent);
+    background: var(--accentbg); border: 1px solid var(--accentbd);
+    border-radius: 10px; padding: 1px 7px;
+  }
+
+  .news-result {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 8px;
+  }
+  .news-result__meta { display: flex; gap: 10px; align-items: center; margin-bottom: 0.5rem; }
+  .news-result__source {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--accent); background: var(--accentbg); border: 1px solid var(--accentbd);
+    border-radius: 4px; padding: 2px 7px;
+  }
+  .news-result__time { font-size: 11px; color: var(--txt3); }
+  .news-result__title {
+    display: block; font-size: 15px; font-weight: 600; color: var(--txt);
+    text-decoration: none; line-height: 1.4; margin-bottom: 0.5rem;
+    transition: color 0.15s;
+  }
+  .news-result__title:hover { color: var(--accent); }
+  .news-result__summary { font-size: 13px; color: var(--txt3); line-height: 1.6; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+</style>

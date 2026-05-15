@@ -1,6 +1,6 @@
 ---
 interface Props { totalReports?: number; totalDistricts?: number; activeReports?: number; }
-const { totalReports = 147, totalDistricts = 21, activeReports = 3 } = Astro.props;
+const { totalReports = 0, totalDistricts = 21, activeReports = 0 } = Astro.props;
 ---
 <section class="hero" aria-label="Presentación de la plataforma">
   <div class="hero__grid-bg" aria-hidden="true"></div>
@@ -10,34 +10,62 @@ const { totalReports = 147, totalDistricts = 21, activeReports = 3 } = Astro.pro
       Urban Intelligence Platform
     </div>
     <h1 class="hero__title syne">Madrid.<br><span class="hero__title-accent">En tiempo real.</span></h1>
-    <p class="hero__sub">Reportes en directo sobre transporte, incidencias urbanas, cultura y vida en los {totalDistricts} distritos de Madrid.</p>
+    <p class="hero__sub">Reportes en profundidad sobre transporte, urbanismo, cultura y vida en los {totalDistricts} distritos de Madrid.</p>
     <div class="hero__search-wrap">
       <label for="hero-search" class="sr-only">Buscar reportes</label>
       <svg class="hero__search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="hero-search" class="hero__search" type="search" placeholder="Buscar reportes, distritos, incidencias..." autocomplete="off" />
+      <input id="hero-search" class="hero__search" type="search" placeholder="Buscar reportes, distritos, incidencias…" autocomplete="off" />
       <kbd class="hero__kbd">⌘K</kbd>
     </div>
     <div class="hero__actions">
       <a href="/reports" class="btn-primary">Explorar reportes</a>
       <a href="/districts" class="btn-secondary">Ver distritos</a>
     </div>
-    <div class="hero__stats">
-      <div class="hero__stat"><span class="hero__stat-n syne">{totalDistricts}</span><span class="hero__stat-l">Distritos</span></div>
-      <div class="hero__stat-div" aria-hidden="true"></div>
-      <div class="hero__stat"><span class="hero__stat-n syne">{totalReports}</span><span class="hero__stat-l">Reportes</span></div>
-      <div class="hero__stat-div" aria-hidden="true"></div>
-      <div class="hero__stat"><span class="hero__stat-n syne">{activeReports}</span><span class="hero__stat-l">Activos ahora</span></div>
-    </div>
+    {(totalReports > 0 || totalDistricts > 0) && (
+      <div class="hero__stats">
+        <div class="hero__stat"><span class="hero__stat-n syne">{totalDistricts}</span><span class="hero__stat-l">Distritos</span></div>
+        <div class="hero__stat-div" aria-hidden="true"></div>
+        <div class="hero__stat"><span class="hero__stat-n syne">{totalReports}</span><span class="hero__stat-l">Reportes</span></div>
+        {activeReports > 0 && (
+          <>
+            <div class="hero__stat-div" aria-hidden="true"></div>
+            <div class="hero__stat"><span class="hero__stat-n syne">{activeReports}</span><span class="hero__stat-l">Esta semana</span></div>
+          </>
+        )}
+      </div>
+    )}
   </div>
 </section>
+
+<script>
+  const input = document.getElementById('hero-search') as HTMLInputElement | null;
+  if (input) {
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        input.focus();
+        input.select();
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const q = input.value.trim();
+        if (q.length >= 2) window.location.href = `/search?q=${encodeURIComponent(q)}`;
+      }
+    });
+  }
+</script>
 
 <style>
   .hero { position: relative; padding: 3.5rem 1.5rem 2.5rem; border-bottom: 1px solid var(--border); overflow: hidden; }
   .hero__grid-bg {
     position: absolute; inset: 0; pointer-events: none;
-    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
     background-size: 40px 40px;
     mask-image: radial-gradient(ellipse 80% 80% at 50% 0%, black 40%, transparent 100%);
+    opacity: 0.6;
   }
   .hero__inner { position: relative; z-index: 1; max-width: 640px; }
   .hero__badge {
@@ -47,28 +75,51 @@ const { totalReports = 147, totalDistricts = 21, activeReports = 3 } = Astro.pro
     font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 600;
     color: var(--accent); letter-spacing: 0.06em; margin-bottom: 1.25rem;
   }
-  .hero__title { font-size: clamp(32px, 5vw, 52px); font-weight: 800; line-height: 1.05; letter-spacing: -1.5px; color: var(--txt); margin-bottom: 1rem; }
+  .hero__title {
+    font-size: clamp(32px, 5vw, 52px); font-weight: 800;
+    line-height: 1.05; letter-spacing: -1.5px;
+    color: var(--txt); margin-bottom: 1rem;
+  }
   .hero__title-accent { color: var(--accent); }
-  .hero__sub { font-size: 14px; font-weight: 300; color: var(--txt2); line-height: 1.75; max-width: 480px; margin-bottom: 1.75rem; }
+  .hero__sub { font-size: 14px; font-weight: 400; color: var(--txt2); line-height: 1.75; max-width: 480px; margin-bottom: 1.75rem; }
   .hero__search-wrap { position: relative; max-width: 480px; margin-bottom: 1.5rem; }
   .hero__search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--txt3); pointer-events: none; }
   .hero__search {
     width: 100%; background: var(--bg3); border: 1px solid var(--border2);
     border-radius: var(--radius-sm); padding: 10px 60px 10px 38px;
     font-size: 13px; font-family: 'Inter', sans-serif; color: var(--txt); outline: none;
-    transition: border-color 0.15s; appearance: none;
+    transition: border-color 0.15s, box-shadow 0.15s; appearance: none;
+    box-shadow: var(--shadow-sm);
   }
   .hero__search::placeholder { color: var(--txt3); }
-  .hero__search:focus { border-color: var(--border3); }
-  .hero__kbd { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: var(--bg4); border: 1px solid var(--border2); border-radius: 4px; padding: 2px 6px; font-size: 10px; color: var(--txt3); pointer-events: none; }
+  .hero__search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accentbg); }
+  .hero__kbd {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: var(--bg4); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 6px; font-size: 10px; color: var(--txt3); pointer-events: none;
+  }
   .hero__actions { display: flex; gap: 10px; margin-bottom: 2.5rem; flex-wrap: wrap; }
-  .btn-primary { display: inline-flex; align-items: center; gap: 6px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 500; font-family: 'Inter', sans-serif; padding: 9px 20px; border-radius: var(--radius-sm); text-decoration: none; transition: opacity 0.15s; }
-  .btn-primary:hover { opacity: 0.88; }
-  .btn-secondary { display: inline-flex; align-items: center; background: transparent; color: var(--txt2); font-size: 13px; font-family: 'Inter', sans-serif; padding: 9px 20px; border-radius: var(--radius-sm); border: 1px solid var(--border2); text-decoration: none; transition: color 0.15s, border-color 0.15s; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent); color: #fff;
+    font-size: 13px; font-weight: 500; font-family: 'Inter', sans-serif;
+    padding: 9px 22px; border-radius: var(--radius-sm); text-decoration: none;
+    transition: opacity 0.15s, box-shadow 0.15s;
+    box-shadow: var(--shadow-sm);
+  }
+  .btn-primary:hover { opacity: 0.88; box-shadow: var(--shadow); }
+  .btn-secondary {
+    display: inline-flex; align-items: center;
+    background: var(--bg3); color: var(--txt2);
+    font-size: 13px; font-family: 'Inter', sans-serif;
+    padding: 9px 20px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border2); text-decoration: none;
+    transition: color 0.15s, border-color 0.15s;
+  }
   .btn-secondary:hover { color: var(--txt); border-color: var(--border3); }
   .hero__stats { display: flex; align-items: center; gap: 1.75rem; flex-wrap: wrap; }
   .hero__stat { display: flex; flex-direction: column; gap: 3px; }
   .hero__stat-n { font-size: 28px; font-weight: 800; line-height: 1; color: var(--txt); }
-  .hero__stat-l { font-size: 11px; color: var(--txt3); letter-spacing: 0.04em; text-transform: uppercase; }
+  .hero__stat-l { font-size: 10px; color: var(--txt3); letter-spacing: 0.06em; text-transform: uppercase; }
   .hero__stat-div { width: 1px; height: 32px; background: var(--border2); }
 </style>
