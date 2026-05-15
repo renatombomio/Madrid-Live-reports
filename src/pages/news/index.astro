@@ -2,37 +2,57 @@
 import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
 import NewsCard from '../../components/NewsCard.astro';
 import Sidebar from '../../components/Sidebar.astro';
+import EmptyState from '../../components/EmptyState.astro';
 import { db } from '../../db';
 import { news, user, districts } from '../../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 
-const allNews = await db
-  .select({
-    id: news.id,
-    title: news.title,
-    slug: news.slug,
-    summary: news.summary,
-    coverImage: news.coverImage,
+const [allNews, [{ n: total }]] = await Promise.all([
+  db.select({
+    id:          news.id,
+    title:       news.title,
+    slug:        news.slug,
+    summary:     news.summary,
+    coverImage:  news.coverImage,
     publishedAt: news.publishedAt,
-    authorName: user.name,
-    source: news.source,
+    authorName:  user.name,
+    source:      news.source,
     districtName: districts.name,
   })
   .from(news)
   .innerJoin(user, eq(news.authorId, user.id))
   .leftJoin(districts, eq(news.districtId, districts.id))
   .where(eq(news.status, 'published'))
-  .orderBy(desc(news.publishedAt));
+  .orderBy(desc(news.publishedAt)),
+
+  db.select({ n: sql<number>`count(*)`.mapWith(Number) })
+    .from(news)
+    .where(eq(news.status, 'published')),
+]);
 ---
 
-<PublicDashboardLayout title="Noticias" description="Últimas noticias de Madrid.">
+<PublicDashboardLayout
+  title="Noticias — Madrid Live Reports"
+  description="Últimas noticias sobre Madrid."
+  showTicker={false}
+>
+  <div class="page-header">
+    <div class="page-header__inner">
+      <div class="page-header__breadcrumb syne">
+        <a href="/">Madrid Live</a>
+        <span aria-hidden="true">/</span>
+        <span>Noticias</span>
+      </div>
+      <h1 class="page-header__title syne">Noticias</h1>
+      <p class="page-header__sub">
+        Últimas noticias de Madrid y sus distritos.
+        {total > 0 && <span class="page-header__count">{total} publicadas</span>}
+      </p>
+    </div>
+  </div>
+
   <div class="news-layout">
     <main class="news-main">
-      <div class="page-head">
-        <h1 class="page-title syne">Noticias</h1>
-        <span class="page-count">{allNews.length} publicadas</span>
-      </div>
-
       {allNews.length > 0 ? (
         <div class="news-list">
           {allNews.map((item) => (
@@ -40,9 +60,12 @@ const allNews = await db
           ))}
         </div>
       ) : (
-        <div class="empty-state">
-          <p>No hay noticias publicadas todavía.</p>
-        </div>
+        <EmptyState
+          icon="news"
+          title="Sin noticias publicadas"
+          message="Aún no hay noticias. Publícalas desde el panel de administración."
+          action={{ label: 'Ir al admin', href: '/admin' }}
+        />
       )}
     </main>
     <Sidebar />
@@ -50,45 +73,41 @@ const allNews = await db
 </PublicDashboardLayout>
 
 <style>
+  .page-header {
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 1.5rem 2rem;
+    background: var(--bg2);
+  }
+  .page-header__inner { max-width: 800px; }
+  .page-header__breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--txt3); margin-bottom: 1rem;
+  }
+  .page-header__breadcrumb a { color: var(--txt3); text-decoration: none; transition: color 0.15s; }
+  .page-header__breadcrumb a:hover { color: var(--accent); }
+  .page-header__title {
+    font-size: clamp(24px, 4vw, 36px); font-weight: 800;
+    letter-spacing: -0.5px; color: var(--txt); margin-bottom: 0.5rem;
+  }
+  .page-header__sub { font-size: 13px; color: var(--txt2); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .page-header__count {
+    font-size: 10px; font-weight: 700; color: var(--accent);
+    background: var(--accentbg); border: 1px solid var(--accentbd);
+    border-radius: 10px; padding: 2px 8px; letter-spacing: 0.04em;
+  }
+
   .news-layout {
     display: grid;
     grid-template-columns: 1fr 280px;
     border-top: 1px solid var(--border);
     min-height: 60vh;
   }
-  .news-main {
-    border-right: 1px solid var(--border);
-  }
-  .page-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.25rem 1.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .page-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--txt2);
-  }
-  .page-count {
-    font-size: 11px;
-    color: var(--txt3);
-  }
+  .news-main { border-right: 1px solid var(--border); }
   .news-list { display: flex; flex-direction: column; }
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6rem 1.5rem;
-    color: var(--txt3);
-    font-size: 14px;
-  }
+
   @media (max-width: 900px) {
     .news-layout { grid-template-columns: 1fr; }
-    .news-main { border-right: none; border-bottom: 1px solid var(--border); }
+    .news-main { border-right: none; }
   }
 </style>

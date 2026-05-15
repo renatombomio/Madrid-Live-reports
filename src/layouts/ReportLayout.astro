@@ -8,10 +8,11 @@ import { CATEGORY_LABELS } from '../lib/content-labels';
 type Report = InferSelectModel<typeof reports>;
 
 interface Props {
-  report: Report & { authorName: string; districtName?: string };
+  report: Report & { authorName: string; districtName?: string | null };
 }
 
 const { report } = Astro.props;
+
 const formattedDate = report.publishedAt
   ? new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(report.publishedAt)
   : null;
@@ -31,15 +32,29 @@ const categoryLabel = CATEGORY_LABELS[report.category] ?? report.category;
         <img src={report.coverImage} alt={report.title} class="article__cover" />
       )}
       <div class="article__body">
+        <nav class="article__breadcrumb syne" aria-label="Navegación de ruta">
+          <a href="/">Madrid Live</a>
+          <span aria-hidden="true">/</span>
+          <a href="/reports">Reportes</a>
+          <span aria-hidden="true">/</span>
+          <span>{report.title.length > 40 ? report.title.slice(0, 40) + '…' : report.title}</span>
+        </nav>
+
         <div class="article__meta">
           <span class="article__cat syne">{categoryLabel}</span>
           {report.districtName && <span class="article__district">{report.districtName}</span>}
           {formattedDate && <time class="article__date">{formattedDate}</time>}
         </div>
+
         <h1 class="article__title syne">{report.title}</h1>
         <p class="article__summary">{report.summary}</p>
         <p class="article__byline">Por {report.authorName}</p>
+
         <div class="article-content" set:html={report.content} />
+
+        <div class="article__back">
+          <a href="/reports">← Volver a reportes</a>
+        </div>
       </div>
     </article>
     <Sidebar />
@@ -53,75 +68,57 @@ const categoryLabel = CATEGORY_LABELS[report.category] ?? report.category;
     border-top: 1px solid var(--border);
     min-height: 60vh;
   }
-  .article {
-    border-right: 1px solid var(--border);
+  .article { border-right: 1px solid var(--border); }
+  .article__cover { width: 100%; max-height: 360px; object-fit: cover; }
+  .article__body { padding: 2.5rem 2rem; max-width: 720px; }
+
+  .article__breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--txt3); margin-bottom: 1.75rem;
   }
-  .article__cover {
-    width: 100%;
-    height: 300px;
-    object-fit: cover;
-  }
-  .article__body {
-    padding: 2rem 1.5rem;
-  }
+  .article__breadcrumb a { color: var(--txt3); text-decoration: none; transition: color 0.15s; }
+  .article__breadcrumb a:hover { color: var(--accent); }
+
   .article__meta {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     margin-bottom: 1.25rem;
-    flex-wrap: wrap;
   }
   .article__cat {
-    background: var(--accentbg);
-    border: 1px solid var(--accentbd);
-    color: var(--accent);
-    font-family: 'Syne', sans-serif;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 2px 8px;
-    border-radius: 4px;
+    background: var(--accentbg); border: 1px solid var(--accentbd); color: var(--accent);
+    font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px;
   }
   .article__district {
-    background: var(--bg4);
-    border: 1px solid var(--border2);
-    border-radius: 4px;
-    padding: 2px 7px;
-    font-size: 10px;
-    color: var(--txt2);
-    font-family: 'Syne', sans-serif;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    background: var(--bg4); border: 1px solid var(--border2); border-radius: 4px;
+    padding: 2px 7px; font-size: 10px; color: var(--txt2);
+    font-family: 'Syne', sans-serif; font-weight: 600; letter-spacing: 0.04em;
   }
-  .article__date {
-    font-size: 12px;
-    color: var(--txt3);
-  }
+  .article__date { font-size: 12px; color: var(--txt3); }
+
   .article__title {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(22px, 3vw, 32px);
-    font-weight: 800;
-    letter-spacing: -0.5px;
-    color: var(--txt);
-    margin-bottom: 1rem;
-    line-height: 1.2;
+    font-size: clamp(22px, 3.5vw, 34px); font-weight: 800;
+    letter-spacing: -0.5px; color: var(--txt);
+    margin-bottom: 1rem; line-height: 1.2;
   }
   .article__summary {
-    font-size: 15px;
-    font-weight: 300;
-    color: var(--txt2);
-    line-height: 1.75;
-    margin-bottom: 0.75rem;
+    font-size: 16px; font-weight: 300; color: var(--txt2);
+    line-height: 1.75; margin-bottom: 0.5rem;
+    border-left: 3px solid var(--border2); padding-left: 1rem;
   }
-  .article__byline {
-    font-size: 12px;
-    color: var(--txt3);
-    margin-bottom: 2rem;
+  .article__byline { font-size: 12px; color: var(--txt3); margin-bottom: 2.5rem; }
+
+  .article__back {
+    margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
   }
+  .article__back a {
+    font-size: 13px; color: var(--txt3); text-decoration: none; transition: color 0.15s;
+  }
+  .article__back a:hover { color: var(--accent); }
+
   @media (max-width: 900px) {
     .article-layout { grid-template-columns: 1fr; }
-    .article { border-right: none; border-bottom: 1px solid var(--border); }
+    .article { border-right: none; }
+    .article__body { padding: 2rem 1.25rem; }
   }
 </style>

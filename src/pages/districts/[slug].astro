@@ -1,10 +1,10 @@
 ---
 import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
 import ReportCard from '../../components/ReportCard.astro';
-import Sidebar from '../../components/Sidebar.astro';
+import EmptyState from '../../components/EmptyState.astro';
 import { db } from '../../db';
 import { districts, reports, user } from '../../db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 
 const { slug } = Astro.params;
 
@@ -18,112 +18,175 @@ const [district] = await db
 
 if (!district) return Astro.redirect('/districts', 307);
 
-const districtReports = await db
-  .select({
-    id: reports.id,
-    title: reports.title,
-    slug: reports.slug,
-    summary: reports.summary,
+const [districtReports, [{ n: totalReports }]] = await Promise.all([
+  db.select({
+    title:       reports.title,
+    slug:        reports.slug,
+    summary:     reports.summary,
+    category:    reports.category,
     publishedAt: reports.publishedAt,
-    authorName: user.name,
   })
   .from(reports)
-  .innerJoin(user, eq(reports.authorId, user.id))
   .where(and(eq(reports.districtId, district.id), eq(reports.status, 'published')))
-  .orderBy(desc(reports.publishedAt));
+  .orderBy(desc(reports.publishedAt)),
+
+  db.select({ n: sql<number>`count(*)`.mapWith(Number) })
+    .from(reports)
+    .where(and(eq(reports.districtId, district.id), eq(reports.status, 'published'))),
+]);
+
+const CATEGORY_DISPLAY: Record<string, string> = {
+  urban_development: 'Urbanismo',
+  transport:         'Transporte',
+  culture:           'Cultura',
+  environment:       'Medio ambiente',
+  economy:           'Economía',
+  safety:            'Seguridad',
+  health:            'Salud',
+  education:         'Educación',
+  tourism:           'Turismo',
+  general:           'General',
+};
 ---
 
 <PublicDashboardLayout
-  title={`${district.name} — Distritos`}
+  title={`${district.name} — Madrid Live Reports`}
   description={district.description ?? `Reportes publicados en el distrito ${district.name}.`}
   showTicker={false}
 >
+  <div class="page-header">
+    <div class="page-header__inner">
+      <div class="page-header__breadcrumb syne">
+        <a href="/">Madrid Live</a>
+        <span aria-hidden="true">/</span>
+        <a href="/districts">Distritos</a>
+        <span aria-hidden="true">/</span>
+        <span>{district.name}</span>
+      </div>
+      <h1 class="page-header__title syne">{district.name}</h1>
+      <p class="page-header__sub">
+        {district.description ?? 'Distrito de Madrid.'}
+        {totalReports > 0 && (
+          <span class="page-header__count">
+            {totalReports} {totalReports === 1 ? 'reporte' : 'reportes'}
+          </span>
+        )}
+      </p>
+    </div>
+  </div>
+
   <div class="district-layout">
     <main class="district-main">
-      <div class="breadcrumb">
-        <a href="/districts" class="breadcrumb__back">← Distritos</a>
-      </div>
-      <div class="district-head">
-        <h1 class="district-name syne">{district.name}</h1>
-        {district.description && <p class="district-desc">{district.description}</p>}
-        <span class="district-count">{districtReports.length} {districtReports.length === 1 ? 'reporte' : 'reportes'} publicados</span>
-      </div>
-
       {districtReports.length > 0 ? (
         <div class="reports-list">
           {districtReports.map(r => (
             <ReportCard
               title={r.title}
-              excerpt={r.summary}
               slug={r.slug}
+              excerpt={r.summary}
               district={district.name}
               publishedAt={r.publishedAt ?? undefined}
+              tags={[CATEGORY_DISPLAY[r.category] ?? r.category]}
             />
           ))}
         </div>
       ) : (
-        <div class="empty-state">
-          <p>No hay reportes publicados en este distrito todavía.</p>
-        </div>
+        <EmptyState
+          icon="reports"
+          title="Sin reportes en este distrito"
+          message={`Aún no hay reportes publicados en ${district.name}.`}
+          action={{ label: 'Ver todos los distritos', href: '/districts' }}
+        />
       )}
     </main>
-    <Sidebar />
+
+    <aside class="district-sidebar">
+      <div class="sidebar-block">
+        <div class="sidebar-block__head syne">Sobre el distrito</div>
+        <div class="sidebar-stat">
+          <span class="sidebar-stat__label">Reportes publicados</span>
+          <span class="sidebar-stat__value syne">{totalReports}</span>
+        </div>
+        {district.description && (
+          <div class="sidebar-desc">{district.description}</div>
+        )}
+      </div>
+
+      <div class="sidebar-block">
+        <div class="sidebar-block__head syne">Explorar</div>
+        <a href="/districts" class="sidebar-link">← Todos los distritos</a>
+        <a href="/reports" class="sidebar-link">Ver todos los reportes</a>
+      </div>
+    </aside>
   </div>
 </PublicDashboardLayout>
 
 <style>
+  .page-header {
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 1.5rem 2rem;
+    background: var(--bg2);
+  }
+  .page-header__inner { max-width: 800px; }
+  .page-header__breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--txt3); margin-bottom: 1rem;
+  }
+  .page-header__breadcrumb a { color: var(--txt3); text-decoration: none; transition: color 0.15s; }
+  .page-header__breadcrumb a:hover { color: var(--accent); }
+  .page-header__title {
+    font-size: clamp(24px, 4vw, 36px); font-weight: 800;
+    letter-spacing: -0.5px; color: var(--txt); margin-bottom: 0.5rem;
+  }
+  .page-header__sub { font-size: 13px; color: var(--txt2); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .page-header__count {
+    font-size: 10px; font-weight: 700; color: var(--accent);
+    background: var(--accentbg); border: 1px solid var(--accentbd);
+    border-radius: 10px; padding: 2px 8px; letter-spacing: 0.04em;
+  }
+
   .district-layout {
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 1fr 220px;
     border-top: 1px solid var(--border);
     min-height: 60vh;
   }
   .district-main { border-right: 1px solid var(--border); }
-  .breadcrumb {
-    padding: 1rem 1.5rem 0;
-  }
-  .breadcrumb__back {
-    font-size: 12px;
-    color: var(--txt3);
-    text-decoration: none;
-    transition: color 0.15s;
-  }
-  .breadcrumb__back:hover { color: var(--accent); }
-  .district-head {
-    padding: 1rem 1.5rem 1.25rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-  .district-name {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(20px, 3vw, 28px);
-    font-weight: 800;
-    color: var(--txt);
-    letter-spacing: -0.3px;
-  }
-  .district-desc {
-    font-size: 13px;
-    color: var(--txt3);
-    line-height: 1.6;
-  }
-  .district-count {
-    font-size: 11px;
-    color: var(--txt3);
-    margin-top: 0.25rem;
-  }
   .reports-list { display: flex; flex-direction: column; }
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6rem 1.5rem;
-    color: var(--txt3);
-    font-size: 14px;
+
+  .district-sidebar { background: var(--bg); }
+  .sidebar-block { border-bottom: 1px solid var(--border); }
+  .sidebar-block:last-child { border-bottom: none; }
+  .sidebar-block__head {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--txt3);
+    padding: 1rem 1.25rem 0.5rem;
+    border-bottom: 1px solid var(--border);
   }
+  .sidebar-stat {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-stat:last-of-type { border-bottom: none; }
+  .sidebar-stat__label { font-size: 11px; color: var(--txt3); }
+  .sidebar-stat__value { font-size: 20px; font-weight: 800; color: var(--txt); }
+  .sidebar-desc {
+    font-size: 12px; color: var(--txt3); line-height: 1.6;
+    padding: 0.75rem 1.25rem;
+  }
+  .sidebar-link {
+    display: block; padding: 0.65rem 1.25rem;
+    font-size: 12px; color: var(--txt2); text-decoration: none;
+    border-bottom: 1px solid var(--border); transition: color 0.15s, background 0.15s;
+  }
+  .sidebar-link:last-child { border-bottom: none; }
+  .sidebar-link:hover { color: var(--accent); background: var(--bg2); }
+
   @media (max-width: 900px) {
     .district-layout { grid-template-columns: 1fr; }
-    .district-main { border-right: none; border-bottom: 1px solid var(--border); }
+    .district-main { border-right: none; }
+    .district-sidebar { display: none; }
   }
 </style>

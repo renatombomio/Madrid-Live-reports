@@ -1,14 +1,15 @@
 ---
 import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
+import EmptyState from '../../components/EmptyState.astro';
 import { db } from '../../db';
 import { districts, reports } from '../../db/schema';
 import { eq, asc, sql, and } from 'drizzle-orm';
 
 const districtStats = await db
   .select({
-    id: districts.id,
-    name: districts.name,
-    slug: districts.slug,
+    id:          districts.id,
+    name:        districts.name,
+    slug:        districts.slug,
     description: districts.description,
     reportCount: sql<number>`count(${reports.id})`.mapWith(Number),
   })
@@ -18,12 +19,27 @@ const districtStats = await db
   .orderBy(asc(districts.name));
 
 const maxCount = Math.max(...districtStats.map(d => d.reportCount), 1);
+const total = districtStats.length;
 ---
 
-<PublicDashboardLayout title="Distritos de Madrid" description="Explora los 21 distritos de Madrid y sus reportes.">
-  <div class="page-head">
-    <h1 class="page-title syne">Distritos</h1>
-    <span class="page-count">{districtStats.length} distritos</span>
+<PublicDashboardLayout
+  title="Distritos de Madrid — Madrid Live Reports"
+  description="Explora los 21 distritos de Madrid y sus reportes."
+  showTicker={false}
+>
+  <div class="page-header">
+    <div class="page-header__inner">
+      <div class="page-header__breadcrumb syne">
+        <a href="/">Madrid Live</a>
+        <span aria-hidden="true">/</span>
+        <span>Distritos</span>
+      </div>
+      <h1 class="page-header__title syne">Distritos</h1>
+      <p class="page-header__sub">
+        Reportes organizados por los distritos oficiales de Madrid.
+        {total > 0 && <span class="page-header__count">{total} distritos</span>}
+      </p>
+    </div>
   </div>
 
   {districtStats.length > 0 ? (
@@ -37,7 +53,7 @@ const maxCount = Math.max(...districtStats.map(d => d.reportCount), 1);
             )}
             <div class="district-card__footer">
               <span class="district-card__count">{district.reportCount} reportes</span>
-              <div class="dist-bar" style={`width: 80px;`}>
+              <div class="dist-bar">
                 <div
                   class="dist-bar-fill"
                   style={`width: ${Math.round((district.reportCount / maxCount) * 100)}%`}
@@ -49,29 +65,40 @@ const maxCount = Math.max(...districtStats.map(d => d.reportCount), 1);
       ))}
     </div>
   ) : (
-    <div class="empty-state">
-      <p>No hay distritos disponibles.</p>
-    </div>
+    <EmptyState
+      icon="districts"
+      title="Sin distritos"
+      message="No hay distritos configurados todavía. Añádelos desde el panel de administración."
+      action={{ label: 'Ir al admin', href: '/admin' }}
+    />
   )}
 </PublicDashboardLayout>
 
 <style>
-  .page-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1.25rem 1.5rem 0.75rem;
+  .page-header {
     border-bottom: 1px solid var(--border);
+    padding: 2.5rem 1.5rem 2rem;
+    background: var(--bg2);
   }
-  .page-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--txt2);
+  .page-header__inner { max-width: 800px; }
+  .page-header__breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--txt3); margin-bottom: 1rem;
   }
-  .page-count { font-size: 11px; color: var(--txt3); }
+  .page-header__breadcrumb a { color: var(--txt3); text-decoration: none; transition: color 0.15s; }
+  .page-header__breadcrumb a:hover { color: var(--accent); }
+  .page-header__title {
+    font-size: clamp(24px, 4vw, 36px); font-weight: 800;
+    letter-spacing: -0.5px; color: var(--txt); margin-bottom: 0.5rem;
+  }
+  .page-header__sub { font-size: 13px; color: var(--txt2); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .page-header__count {
+    font-size: 10px; font-weight: 700; color: var(--accent);
+    background: var(--accentbg); border: 1px solid var(--accentbd);
+    border-radius: 10px; padding: 2px 8px; letter-spacing: 0.04em;
+  }
+
   .districts-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -80,53 +107,40 @@ const maxCount = Math.max(...districtStats.map(d => d.reportCount), 1);
   .district-card {
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-    text-decoration: none;
-    color: inherit;
-    background: var(--bg);
-    display: block;
+    text-decoration: none; color: inherit;
+    background: var(--bg); display: block;
   }
   .district-card:nth-child(4n) { border-right: none; }
-  .district-card__body { padding: 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; height: 100%; }
+  .district-card__body {
+    padding: 1.25rem;
+    display: flex; flex-direction: column; gap: 0.5rem; height: 100%;
+  }
   .district-card__name {
-    font-family: 'Syne', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--txt);
-    transition: color 0.15s;
+    font-size: 14px; font-weight: 700; color: var(--txt); transition: color 0.15s;
   }
   .district-card:hover .district-card__name { color: var(--accent); }
   .district-card__desc {
-    font-size: 12px;
-    color: var(--txt3);
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    flex: 1;
+    font-size: 12px; color: var(--txt3); line-height: 1.5; flex: 1;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   }
   .district-card__footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: auto;
-    padding-top: 0.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: auto; padding-top: 0.5rem;
   }
   .district-card__count { font-size: 11px; color: var(--txt3); }
-  .empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6rem 1.5rem;
-    color: var(--txt3);
-    font-size: 14px;
-  }
+  .dist-bar { width: 80px; }
+
   @media (max-width: 1024px) {
-    .districts-grid { grid-template-columns: repeat(2, 1fr); }
+    .districts-grid { grid-template-columns: repeat(3, 1fr); }
     .district-card:nth-child(4n) { border-right: 1px solid var(--border); }
+    .district-card:nth-child(3n) { border-right: none; }
+  }
+  @media (max-width: 640px) {
+    .districts-grid { grid-template-columns: repeat(2, 1fr); }
+    .district-card:nth-child(3n) { border-right: 1px solid var(--border); }
     .district-card:nth-child(2n) { border-right: none; }
   }
-  @media (max-width: 600px) {
+  @media (max-width: 400px) {
     .districts-grid { grid-template-columns: 1fr; }
     .district-card:nth-child(n) { border-right: none; }
   }
