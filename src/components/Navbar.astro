@@ -1,11 +1,14 @@
 ---
+const path = Astro.url.pathname;
+const active = (href: string) =>
+  href === '/' ? path === '/' : path.startsWith(href);
 ---
 <header class="navbar">
-  <div class="navbar__logo syne">MADRID<span>LIVE</span></div>
+  <a href="/" class="navbar__logo syne" aria-label="Madrid Live Reports — inicio">MADRID<span>LIVE</span></a>
   <nav class="navbar__links" aria-label="Navegación principal">
-    <a href="/reports">Reportes</a>
-    <a href="/districts">Distritos</a>
-    <a href="/news">Noticias</a>
+    <a href="/reports"   class:list={[{ active: active('/reports')   }]}>Reportes</a>
+    <a href="/districts" class:list={[{ active: active('/districts') }]}>Distritos</a>
+    <a href="/news"      class:list={[{ active: active('/news')      }]}>Noticias</a>
   </nav>
   <div class="navbar__right">
     <a href="/reports" class="navbar__cta">
@@ -30,11 +33,25 @@
     position: sticky; top: 0; z-index: 50;
     backdrop-filter: blur(12px);
   }
-  .navbar__logo { font-size: 15px; font-weight: 800; letter-spacing: 0.05em; color: var(--txt); }
+  .navbar__logo {
+    font-size: 15px; font-weight: 800; letter-spacing: 0.05em;
+    color: var(--txt); text-decoration: none;
+    transition: opacity 0.15s;
+  }
+  .navbar__logo:hover { opacity: 0.75; }
   .navbar__logo span { color: var(--accent); }
   .navbar__links { display: flex; gap: 1.75rem; }
-  .navbar__links a { font-size: 13px; color: var(--txt2); text-decoration: none; letter-spacing: 0.02em; transition: color 0.15s; }
+  .navbar__links a {
+    font-size: 13px; color: var(--txt2); text-decoration: none;
+    letter-spacing: 0.02em; transition: color 0.15s;
+    position: relative; padding-bottom: 2px;
+  }
   .navbar__links a:hover { color: var(--txt); }
+  .navbar__links a.active { color: var(--txt); }
+  .navbar__links a.active::after {
+    content: ''; position: absolute; bottom: -17px; left: 0; right: 0;
+    height: 2px; background: var(--accent); border-radius: 1px;
+  }
   .navbar__right { display: flex; align-items: center; gap: 12px; }
   .navbar__cta {
     display: flex; align-items: center; gap: 5px;
