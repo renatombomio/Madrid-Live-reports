@@ -7,19 +7,42 @@ import Sidebar        from '../components/Sidebar.astro';
 import DistrictsGrid  from '../components/DistrictsGrid.astro';
 import CategoriesGrid from '../components/CategoriesGrid.astro';
 import EmptyState     from '../components/EmptyState.astro';
-import { getHomepageData } from '../lib/data/queries';
+import { getHomepageData, getActivitySignals } from '../lib/data/queries';
 import { CATEGORY_DISPLAY } from '../lib/content-labels';
 
-const {
-  totalReports,
-  totalDistricts,
-  activeReports,
-  featuredReports,
-  liveCards,
-  feedItems,
-  districtItems,
-  categoryItems,
-} = await getHomepageData();
+const [
+  {
+    totalReports,
+    totalDistricts,
+    activeReports,
+    featuredReports,
+    liveCards,
+    feedItems,
+    districtItems,
+    categoryItems,
+  },
+  activitySignals,
+] = await Promise.all([getHomepageData(), getActivitySignals()]);
+
+const sidebarSignals = [
+  activitySignals.trendingDistricts[0] && {
+    label: 'Distrito más activo esta semana',
+    value: activitySignals.trendingDistricts[0].name,
+    sub:   `${activitySignals.trendingDistricts[0].weekCount} reportes esta semana`,
+    href:  `/districts/${activitySignals.trendingDistricts[0].slug}`,
+  },
+  activitySignals.hotCategories[0] && {
+    label: 'Categoría destacada',
+    value: CATEGORY_DISPLAY[activitySignals.hotCategories[0].category]?.name ?? activitySignals.hotCategories[0].category,
+    sub:   `${activitySignals.hotCategories[0].weekCount} publicaciones esta semana`,
+    href:  `/search?category=${activitySignals.hotCategories[0].category}`,
+  },
+  activitySignals.weekTotal > 0 && {
+    label: 'Esta semana',
+    value: `${activitySignals.weekTotal} ${activitySignals.weekTotal === 1 ? 'reporte nuevo' : 'reportes nuevos'}`,
+    sub:   activitySignals.happeningNow > 0 ? `${activitySignals.happeningNow} en las últimas 24h` : undefined,
+  },
+].filter((s): s is { label: string; value: string; sub?: string; href?: string } => Boolean(s));
 
 // Map raw category stats to CategoriesGrid shape
 const categoryGridItems = categoryItems?.map(c => ({
@@ -58,7 +81,7 @@ const categoryGridItems = categoryItems?.map(c => ({
           />
       }
     </section>
-    <Sidebar feed={feedItems} />
+    <Sidebar feed={feedItems} signals={sidebarSignals.length > 0 ? sidebarSignals : undefined} />
   </div>
 
   <DistrictsGrid districts={districtItems} />

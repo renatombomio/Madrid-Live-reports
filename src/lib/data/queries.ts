@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { reports, news, districts } from '../../db/schema';
-import { eq, desc, and, or, ilike, sql } from 'drizzle-orm';
+import { eq, desc, and, or, ilike, ne, sql } from 'drizzle-orm';
 import { CATEGORY_TO_CARD, FEED_COLORS } from '../content-labels';
 import { fmtRelative } from '../format';
 
@@ -226,7 +226,7 @@ export async function getDistrictDetail(slug: string) {
 
   if (!district) return null;
 
-  const [districtReports, categoryBreakdown, [{ n: totalCount }]] = await Promise.all([
+  const [districtReports, categoryBreakdown, [{ n: totalCount }], [weeklyRow]] = await Promise.all([
     db.select({
       title:       reports.title,
       slug:        reports.slug,
@@ -250,9 +250,42 @@ export async function getDistrictDetail(slug: string) {
     db.select({ n: sql<number>`count(*)`.mapWith(Number) })
       .from(reports)
       .where(and(eq(reports.districtId, district.id), eq(reports.status, 'published'))),
+
+    db.select({
+      thisWeek: sql<number>`count(case when ${reports.publishedAt} > now() - interval '7 days' then 1 end)`.mapWith(Number),
+      lastWeek: sql<number>`count(case when ${reports.publishedAt} > now() - interval '14 days' and ${reports.publishedAt} <= now() - interval '7 days' then 1 end)`.mapWith(Number),
+    })
+    .from(reports)
+    .where(and(eq(reports.districtId, district.id), eq(reports.status, 'published'))),
   ]);
 
-  return { district, reports: districtReports, categories: categoryBreakdown, total: totalCount };
+  const topCategory = categoryBreakdown[0]?.category;
+  const relatedDistricts = topCategory
+    ? await db.select({
+        name:  districts.name,
+        slug:  districts.slug,
+        count: sql<number>`count(${reports.id})`.mapWith(Number),
+      })
+      .from(districts)
+      .innerJoin(reports, and(
+        eq(districts.id, reports.districtId),
+        eq(reports.status, 'published'),
+        sql`${reports.category}::text = ${topCategory}`,
+      ))
+      .where(ne(districts.id, district.id))
+      .groupBy(districts.id, districts.name, districts.slug)
+      .orderBy(sql`count(${reports.id}) desc`)
+      .limit(3)
+    : [];
+
+  return {
+    district,
+    reports:          districtReports,
+    categories:       categoryBreakdown,
+    total:            totalCount,
+    weeklyActivity:   weeklyRow ?? { thisWeek: 0, lastWeek: 0 },
+    relatedDistricts,
+  };
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
@@ -364,4 +397,105 @@ export async function getSearchSuggestions() {
   ]);
 
   return { recentReports, categoryStats, topDistricts };
+}
+
+// ── Activity signals ──────────────────────────────────────────────────────────
+
+export async function getActivitySignals() {
+  const [trendingDistricts, hotCategories, [happeningRow], [weekRow]] = await Promise.all([
+    db.select({
+      name:      districts.name,
+      slug:      districts.slug,
+      weekCount: sql<number>`count(case when ${reports.publishedAt} > now() - interval '7 days' then 1 end)`.mapWith(Number),
+      total:     sql<number>`count(${reports.id})`.mapWith(Number),
+    })
+    .from(districts)
+    .leftJoin(reports, and(
+      eq(districts.id, reports.districtId),
+      eq(reports.status, 'published'),
+    ))
+    .groupBy(districts.id, districts.name, districts.slug)
+    .orderBy(sql`count(case when ${reports.publishedAt} > now() - interval '7 days' then 1 end) desc, count(${reports.id}) desc`)
+    .limit(3),
+
+    db.select({
+      category:  reports.category,
+      weekCount: sql<number>`count(case when ${reports.publishedAt} > now() - interval '7 days' then 1 end)`.mapWith(Number),
+      dayCount:  sql<number>`count(case when ${reports.publishedAt} > now() - interval '24 hours' then 1 end)`.mapWith(Number),
+    })
+    .from(reports)
+    .where(eq(reports.status, 'published'))
+    .groupBy(reports.category)
+    .orderBy(sql`count(case when ${reports.publishedAt} > now() - interval '7 days' then 1 end) desc`)
+    .limit(3),
+
+    db.select({ n: sql<number>`count(*)`.mapWith(Number) })
+      .from(reports)
+      .where(and(
+        eq(reports.status, 'published'),
+        sql`${reports.publishedAt} > now() - interval '24 hours'`,
+      )),
+
+    db.select({ n: sql<number>`count(*)`.mapWith(Number) })
+      .from(reports)
+      .where(and(
+        eq(reports.status, 'published'),
+        sql`${reports.publishedAt} > now() - interval '7 days'`,
+      )),
+  ]);
+
+  return {
+    trendingDistricts: trendingDistricts.filter(d => d.weekCount > 0),
+    hotCategories:     hotCategories.filter(c => c.weekCount > 0),
+    happeningNow:      happeningRow?.n  ?? 0,
+    weekTotal:         weekRow?.n       ?? 0,
+  };
+}
+
+// ── Related content ───────────────────────────────────────────────────────────
+
+export async function getRelatedReports(
+  reportId: number,
+  category: string,
+  districtId: number | null,
+) {
+  const [byCategory, byDistrict] = await Promise.all([
+    db.select({
+      title:        reports.title,
+      slug:         reports.slug,
+      summary:      reports.summary,
+      publishedAt:  reports.publishedAt,
+      districtName: districts.name,
+    })
+    .from(reports)
+    .leftJoin(districts, eq(reports.districtId, districts.id))
+    .where(and(
+      eq(reports.status, 'published'),
+      sql`${reports.category}::text = ${category}`,
+      ne(reports.id, reportId),
+    ))
+    .orderBy(desc(reports.publishedAt))
+    .limit(3),
+
+    districtId
+      ? db.select({
+          title:       reports.title,
+          slug:        reports.slug,
+          summary:     reports.summary,
+          publishedAt: reports.publishedAt,
+        })
+        .from(reports)
+        .where(and(
+          eq(reports.status, 'published'),
+          eq(reports.districtId, districtId),
+          ne(reports.id, reportId),
+        ))
+        .orderBy(desc(reports.publishedAt))
+        .limit(3)
+      : Promise.resolve([] as Array<{
+          title: string; slug: string; summary: string; publishedAt: Date | null;
+        }>),
+  ]);
+
+  return { byCategory, byDistrict };
 }

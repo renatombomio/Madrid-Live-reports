@@ -11,7 +11,8 @@ if (!slug) return Astro.redirect('/districts');
 const detail = await getDistrictDetail(slug);
 if (!detail) return Astro.redirect('/districts', 307);
 
-const { district, reports: districtReports, categories, total: totalReports } = detail;
+const { district, reports: districtReports, categories, total: totalReports, weeklyActivity, relatedDistricts } = detail;
+const weekDelta = weeklyActivity.thisWeek - weeklyActivity.lastWeek;
 ---
 
 <PublicDashboardLayout
@@ -70,7 +71,14 @@ const { district, reports: districtReports, categories, total: totalReports } = 
         <div class="sidebar-block__head syne">Distrito</div>
         <div class="sidebar-stat">
           <span class="sidebar-stat__label">Reportes publicados</span>
-          <span class="sidebar-stat__value syne">{totalReports}</span>
+          <span class="sidebar-stat__value syne">
+            {totalReports}
+            {weeklyActivity.thisWeek > 0 && (
+              <span class={`week-delta week-delta--${weekDelta > 0 ? 'up' : weekDelta < 0 ? 'down' : 'flat'}`}>
+                {weekDelta > 0 ? `+${weekDelta}` : weekDelta < 0 ? `${weekDelta}` : '='} esta semana
+              </span>
+            )}
+          </span>
         </div>
         {district.description && (
           <div class="sidebar-desc">{district.description}</div>
@@ -90,6 +98,18 @@ const { district, reports: districtReports, categories, total: totalReports } = 
               </div>
             );
           })}
+        </div>
+      )}
+
+      {relatedDistricts.length > 0 && (
+        <div class="sidebar-block">
+          <div class="sidebar-block__head syne">Distritos relacionados</div>
+          {relatedDistricts.map(d => (
+            <a href={`/districts/${d.slug}`} class="sidebar-link related-district-row">
+              <span>{d.name}</span>
+              <span class="related-district-count">{d.count}</span>
+            </a>
+          ))}
         </div>
       )}
 
@@ -171,6 +191,20 @@ const { district, reports: districtReports, categories, total: totalReports } = 
   }
   .sidebar-link:last-child { border-bottom: none; }
   .sidebar-link:hover { color: var(--accent); background: var(--bg2); }
+
+  .week-delta {
+    display: block; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.03em; margin-top: 3px;
+  }
+  .week-delta--up   { color: var(--green, #166534); }
+  .week-delta--down { color: var(--txt3); }
+  .week-delta--flat { color: var(--txt3); }
+
+  .related-district-row { display: flex; align-items: center; justify-content: space-between; }
+  .related-district-count {
+    font-size: 10px; font-weight: 700; color: var(--txt3);
+    font-family: 'Syne', sans-serif;
+  }
 
   @media (max-width: 900px) {
     .district-layout { grid-template-columns: 1fr; }

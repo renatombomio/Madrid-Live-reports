@@ -1,18 +1,14 @@
 ---
 interface FeedItem { text: string; time: string; color: 'red'|'blue'|'amber'|'green'|'purple'; }
-interface AiInsight { label: string; value: string; sub?: string; }
-interface Props { feed?: FeedItem[]; insights?: AiInsight[]; }
+interface Signal    { label: string; value: string; sub?: string; href?: string; }
+interface Props { feed?: FeedItem[]; signals?: Signal[]; }
 const { feed = [
   { text: 'Corte Gran Vía confirmado por Ayuntamiento', time: 'Hace 5 min',  color: 'red'    },
   { text: 'Metro L6: normalización prevista para las 20:00h', time: 'Hace 18 min', color: 'blue'   },
   { text: 'Alerta meteorológica activa hasta las 21:00h', time: 'Hace 30 min', color: 'amber'  },
   { text: 'Concierto gratuito en Retiro — 19:30h', time: 'Hace 1h',   color: 'purple' },
   { text: 'BiciMAD: 98% de estaciones operativas', time: 'Hace 2h',   color: 'green'  },
-], insights = [
-  { label: 'Distrito más activo hoy', value: 'Centro — 12 reportes', sub: '+40% sobre media semanal' },
-  { label: 'Tendencia detectada',     value: 'Tráfico inusualmente alto', sub: 'Gran Vía, Sol, Callao' },
-  { label: 'Resumen del día',         value: 'Incidencias de transporte', sub: 'Metro + tráfico afectan Centro' },
-] } = Astro.props;
+], signals } = Astro.props;
 ---
 <aside class="sidebar" aria-label="Panel lateral">
   <section class="sb-section">
@@ -26,16 +22,22 @@ const { feed = [
       ))}
     </ol>
   </section>
-  <section class="sb-section">
-    <div class="sb-head syne">AI Insights <span class="ai-badge syne">Beta</span></div>
-    {insights.map(i => (
-      <div class="ai-card">
-        <p class="ai-label">{i.label}</p>
-        <p class="ai-value syne">{i.value}</p>
-        {i.sub && <p class="ai-sub">{i.sub}</p>}
-      </div>
-    ))}
-  </section>
+
+  {signals && signals.length > 0 && (
+    <section class="sb-section">
+      <div class="sb-head syne">Actividad</div>
+      {signals.map(s => (
+        <div class="sb-signal">
+          <p class="sb-signal__label">{s.label}</p>
+          {s.href
+            ? <a href={s.href} class="sb-signal__value syne">{s.value}</a>
+            : <p class="sb-signal__value syne">{s.value}</p>
+          }
+          {s.sub && <p class="sb-signal__sub">{s.sub}</p>}
+        </div>
+      ))}
+    </section>
+  )}
 </aside>
 <style>
   .sidebar { background: var(--bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
@@ -54,11 +56,12 @@ const { feed = [
   .feed-dot--purple { background: var(--purple); }
   .feed-text { font-size: 12px; color: var(--txt2); line-height: 1.5; margin-bottom: 2px; }
   .feed-time { font-size: 10px; color: var(--txt3); display: block; }
-  .ai-badge { margin-left: auto; background: var(--accentbg); color: var(--accent); border: 1px solid var(--accentbd); border-radius: 4px; padding: 1px 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; }
-  .ai-card { padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
-  .ai-card:last-child { border-bottom: none; }
-  .ai-card:hover { background: var(--bg2); }
-  .ai-label { font-size: 10px; color: var(--txt3); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 3px; }
-  .ai-value { font-size: 13px; font-weight: 700; color: var(--txt); margin-bottom: 2px; }
-  .ai-sub { font-size: 11px; color: var(--txt3); }
+
+  .sb-signal { padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  .sb-signal:last-child { border-bottom: none; }
+  .sb-signal:hover { background: var(--bg2); }
+  .sb-signal__label { font-size: 10px; color: var(--txt3); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 3px; }
+  .sb-signal__value { font-size: 13px; font-weight: 700; color: var(--txt); margin-bottom: 2px; text-decoration: none; display: block; transition: color 0.15s; }
+  a.sb-signal__value:hover { color: var(--accent); }
+  .sb-signal__sub { font-size: 11px; color: var(--txt3); }
 </style>

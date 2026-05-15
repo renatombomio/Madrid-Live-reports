@@ -3,6 +3,7 @@ import ReportLayout from '../../layouts/ReportLayout.astro';
 import { db } from '../../db';
 import { reports, user, districts } from '../../db/schema';
 import { eq, and } from 'drizzle-orm';
+import { getRelatedReports } from '../../lib/data/queries';
 
 const { slug } = Astro.params;
 
@@ -33,6 +34,8 @@ const [result] = await db
   .limit(1);
 
 if (!result) return Astro.redirect('/reports', 307);
+
+const { byCategory: relatedByCategory } = await getRelatedReports(result.id, result.category, result.districtId);
 ---
 
-<ReportLayout report={result} />
+<ReportLayout report={result} relatedByCategory={relatedByCategory} />
