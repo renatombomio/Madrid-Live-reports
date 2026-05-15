@@ -36,10 +36,12 @@ const {
   {showTicker && <Ticker />}
   <slot />
   <footer class="dash-footer">
-    <div class="dash-footer__logo syne">MADRID<span>LIVE</span></div>
+    <a href="/" class="dash-footer__logo syne">MADRID<span>LIVE</span></a>
     <p class="dash-footer__text">Plataforma de inteligencia urbana · Madrid, España</p>
     <div class="dash-footer__links">
-      <a href="/about">Acerca de</a>
+      <a href="/reports">Reportes</a>
+      <a href="/districts">Distritos</a>
+      <a href="/news">Noticias</a>
       <a href="/admin/login">Admin</a>
     </div>
   </footer>
@@ -62,7 +64,10 @@ const {
     letter-spacing: 0.05em;
     color: var(--txt2);
     font-family: 'Syne', sans-serif;
+    text-decoration: none;
+    transition: opacity 0.15s;
   }
+  .dash-footer__logo:hover { opacity: 0.7; }
   .dash-footer__logo span { color: var(--accent); }
   .dash-footer__text { font-size: 11px; color: var(--txt3); }
   .dash-footer__links { display: flex; gap: 1.25rem; }

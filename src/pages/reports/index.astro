@@ -54,7 +54,7 @@ const [allReports, [{ n: total }]] = await Promise.all([
       <h1 class="page-header__title syne">Reportes</h1>
       <p class="page-header__sub">
         Análisis en profundidad sobre los {total} distritos de Madrid.
-        {total > 0 && <span class="page-header__count">{total} publicados</span>}
+        {total > 0 && <span class="page-header__count">{total} {total === 1 ? 'publicado' : 'publicados'}</span>}
       </p>
     </div>
   </div>

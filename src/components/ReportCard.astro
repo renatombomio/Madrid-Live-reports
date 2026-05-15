@@ -6,8 +6,20 @@ interface Props {
 }
 const { title, excerpt, slug, district, tags = [], publishedAt, views } = Astro.props;
 const tagClass: Record<string, string> = {
+  // raw category enum keys
+  urban_development: 'tag-obras',   transport:  'tag-trafico',
+  culture:           'tag-cultura', environment:'tag-obras',
+  economy:           'tag-trafico', safety:     'tag-urgente',
+  health:            'tag-urgente', education:  'tag-cultura',
+  tourism:           'tag-trafico', general:    'tag-obras',
+  // Spanish display names
+  urbanismo:         'tag-obras',   transporte: 'tag-trafico',
+  cultura:           'tag-cultura', economía:   'tag-trafico',
+  seguridad:         'tag-urgente', salud:      'tag-urgente',
+  educación:         'tag-cultura', turismo:    'tag-trafico',
+  // legacy / misc
   urgente: 'tag-urgente', tráfico: 'tag-trafico', trafico: 'tag-trafico',
-  cultura: 'tag-cultura', obras: 'tag-obras', alerta: 'tag-alerta',
+  obras:   'tag-obras',   alerta:  'tag-alerta',
 };
 function fmtDate(d?: Date | string) {
   if (!d) return '';
