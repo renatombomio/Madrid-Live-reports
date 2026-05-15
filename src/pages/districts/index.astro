@@ -1,23 +1,9 @@
 ---
 import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
 import EmptyState from '../../components/EmptyState.astro';
-import { db } from '../../db';
-import { districts, reports } from '../../db/schema';
-import { eq, asc, sql, and } from 'drizzle-orm';
+import { getDistrictsWithStats } from '../../lib/data/queries';
 
-const districtStats = await db
-  .select({
-    id:          districts.id,
-    name:        districts.name,
-    slug:        districts.slug,
-    description: districts.description,
-    reportCount: sql<number>`count(${reports.id})`.mapWith(Number),
-  })
-  .from(districts)
-  .leftJoin(reports, and(eq(districts.id, reports.districtId), eq(reports.status, 'published')))
-  .groupBy(districts.id, districts.name, districts.slug, districts.description)
-  .orderBy(asc(districts.name));
-
+const districtStats = await getDistrictsWithStats();
 const maxCount = Math.max(...districtStats.map(d => d.reportCount), 1);
 const total = districtStats.length;
 ---

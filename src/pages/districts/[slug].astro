@@ -2,51 +2,16 @@
 import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
 import ReportCard from '../../components/ReportCard.astro';
 import EmptyState from '../../components/EmptyState.astro';
-import { db } from '../../db';
-import { districts, reports, user } from '../../db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { getDistrictDetail } from '../../lib/data/queries';
+import { CATEGORY_DISPLAY } from '../../lib/content-labels';
 
 const { slug } = Astro.params;
-
 if (!slug) return Astro.redirect('/districts');
 
-const [district] = await db
-  .select()
-  .from(districts)
-  .where(eq(districts.slug, slug))
-  .limit(1);
+const detail = await getDistrictDetail(slug);
+if (!detail) return Astro.redirect('/districts', 307);
 
-if (!district) return Astro.redirect('/districts', 307);
-
-const [districtReports, [{ n: totalReports }]] = await Promise.all([
-  db.select({
-    title:       reports.title,
-    slug:        reports.slug,
-    summary:     reports.summary,
-    category:    reports.category,
-    publishedAt: reports.publishedAt,
-  })
-  .from(reports)
-  .where(and(eq(reports.districtId, district.id), eq(reports.status, 'published')))
-  .orderBy(desc(reports.publishedAt)),
-
-  db.select({ n: sql<number>`count(*)`.mapWith(Number) })
-    .from(reports)
-    .where(and(eq(reports.districtId, district.id), eq(reports.status, 'published'))),
-]);
-
-const CATEGORY_DISPLAY: Record<string, string> = {
-  urban_development: 'Urbanismo',
-  transport:         'Transporte',
-  culture:           'Cultura',
-  environment:       'Medio ambiente',
-  economy:           'Economía',
-  safety:            'Seguridad',
-  health:            'Salud',
-  education:         'Educación',
-  tourism:           'Turismo',
-  general:           'General',
-};
+const { district, reports: districtReports, categories, total: totalReports } = detail;
 ---
 
 <PublicDashboardLayout
@@ -86,7 +51,7 @@ const CATEGORY_DISPLAY: Record<string, string> = {
               excerpt={r.summary}
               district={district.name}
               publishedAt={r.publishedAt ?? undefined}
-              tags={[CATEGORY_DISPLAY[r.category] ?? r.category]}
+              tags={[CATEGORY_DISPLAY[r.category]?.name ?? r.category]}
             />
           ))}
         </div>
@@ -102,7 +67,7 @@ const CATEGORY_DISPLAY: Record<string, string> = {
 
     <aside class="district-sidebar">
       <div class="sidebar-block">
-        <div class="sidebar-block__head syne">Sobre el distrito</div>
+        <div class="sidebar-block__head syne">Distrito</div>
         <div class="sidebar-stat">
           <span class="sidebar-stat__label">Reportes publicados</span>
           <span class="sidebar-stat__value syne">{totalReports}</span>
@@ -111,6 +76,22 @@ const CATEGORY_DISPLAY: Record<string, string> = {
           <div class="sidebar-desc">{district.description}</div>
         )}
       </div>
+
+      {categories.length > 0 && (
+        <div class="sidebar-block">
+          <div class="sidebar-block__head syne">Temáticas</div>
+          {categories.map(c => {
+            const meta = CATEGORY_DISPLAY[c.category];
+            return (
+              <div class="cat-row">
+                <span class="cat-dot" style={`background:${meta?.color ?? '#9b8c7e'}`}></span>
+                <span class="cat-label">{meta?.name ?? c.category}</span>
+                <span class="cat-count">{c.count}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div class="sidebar-block">
         <div class="sidebar-block__head syne">Explorar</div>
@@ -166,16 +147,23 @@ const CATEGORY_DISPLAY: Record<string, string> = {
   }
   .sidebar-stat {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0.875rem 1.25rem;
-    border-bottom: 1px solid var(--border);
+    padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--border);
   }
-  .sidebar-stat:last-of-type { border-bottom: none; }
   .sidebar-stat__label { font-size: 11px; color: var(--txt3); }
   .sidebar-stat__value { font-size: 20px; font-weight: 800; color: var(--txt); }
-  .sidebar-desc {
-    font-size: 12px; color: var(--txt3); line-height: 1.6;
-    padding: 0.75rem 1.25rem;
+  .sidebar-desc { font-size: 12px; color: var(--txt3); line-height: 1.6; padding: 0.75rem 1.25rem; }
+
+  .cat-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0.55rem 1.25rem; border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
   }
+  .cat-row:last-child { border-bottom: none; }
+  .cat-row:hover { background: var(--bg2); }
+  .cat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .cat-label { font-size: 11px; color: var(--txt2); flex: 1; }
+  .cat-count { font-size: 10px; color: var(--txt3); font-family: 'Syne', sans-serif; font-weight: 700; }
+
   .sidebar-link {
     display: block; padding: 0.65rem 1.25rem;
     font-size: 12px; color: var(--txt2); text-decoration: none;

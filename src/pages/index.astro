@@ -7,186 +7,25 @@ import Sidebar        from '../components/Sidebar.astro';
 import DistrictsGrid  from '../components/DistrictsGrid.astro';
 import CategoriesGrid from '../components/CategoriesGrid.astro';
 import EmptyState     from '../components/EmptyState.astro';
-import { db } from '../db';
-import { reports, news, districts } from '../db/schema';
-import { user } from '../db/schema';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { getHomepageData } from '../lib/data/queries';
+import { CATEGORY_DISPLAY } from '../lib/content-labels';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function fmtRelative(d: Date | string | null | undefined): string {
-  if (!d) return '';
-  const date = typeof d === 'string' ? new Date(d) : d;
-  const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-  if (diff < 1)    return 'Ahora mismo';
-  if (diff < 60)   return `Hace ${diff}m`;
-  if (diff < 1440) return `Hace ${Math.floor(diff / 60)}h`;
-  return `Hace ${Math.floor(diff / 1440)}d`;
-}
+const {
+  totalReports,
+  totalDistricts,
+  activeReports,
+  featuredReports,
+  liveCards,
+  feedItems,
+  districtItems,
+  categoryItems,
+} = await getHomepageData();
 
-const CATEGORY_TO_CARD: Record<string, string> = {
-  transport: 'metro', safety: 'alert', culture: 'culture',
-  environment: 'weather', urban_development: 'alert',
-  economy: 'metro', health: 'alert', education: 'culture',
-  tourism: 'culture', general: 'alert',
-};
-
-const CATEGORY_DISPLAY: Record<string, { name: string; slug: string; color: string }> = {
-  urban_development: { name: 'Urbanismo',      slug: 'obras',         color: '#c56b2d' },
-  transport:         { name: 'Transporte',      slug: 'transporte',    color: '#2563eb' },
-  culture:           { name: 'Cultura',         slug: 'cultura',       color: '#6d28d9' },
-  environment:       { name: 'Medio ambiente',  slug: 'medio-ambiente',color: '#166534' },
-  economy:           { name: 'Economía',        slug: 'economia',      color: '#0891b2' },
-  safety:            { name: 'Seguridad',       slug: 'seguridad',     color: '#b91c1c' },
-  health:            { name: 'Salud',           slug: 'salud',         color: '#be185d' },
-  education:         { name: 'Educación',       slug: 'educacion',     color: '#65a30d' },
-  tourism:           { name: 'Turismo',         slug: 'cultura',       color: '#b45309' },
-  general:           { name: 'General',         slug: 'obras',         color: '#9b8c7e' },
-};
-
-const FEED_COLORS = ['blue', 'red', 'amber', 'purple', 'green'] as const;
-
-// ── All queries in one round-trip ────────────────────────────────────────────
-const [
-  featuredRaw,
-  recentNewsRaw,
-  [totalReportsRow],
-  [totalDistrictsRow],
-  districtStatsRaw,
-  categoryStatsRaw,
-  recentActivityRaw,
-] = await Promise.all([
-
-  // 1. Latest 3 published reports
-  db.select({
-    title:        reports.title,
-    slug:         reports.slug,
-    summary:      reports.summary,
-    publishedAt:  reports.publishedAt,
-    districtName: districts.name,
-  })
-  .from(reports)
-  .leftJoin(districts, eq(reports.districtId, districts.id))
-  .where(eq(reports.status, 'published'))
-  .orderBy(desc(reports.publishedAt))
-  .limit(3),
-
-  // 2. Latest 5 news items for sidebar feed
-  db.select({
-    title:       news.title,
-    publishedAt: news.publishedAt,
-    source:      news.source,
-  })
-  .from(news)
-  .where(eq(news.status, 'published'))
-  .orderBy(desc(news.publishedAt))
-  .limit(5),
-
-  // 3. Total published reports count
-  db.select({ n: sql<number>`count(*)`.mapWith(Number) })
-  .from(reports)
-  .where(eq(reports.status, 'published')),
-
-  // 4. Total districts
-  db.select({ n: sql<number>`count(*)`.mapWith(Number) })
-  .from(districts),
-
-  // 5. Top 8 districts by report count + latest activity
-  db.select({
-    name:        districts.name,
-    slug:        districts.slug,
-    reportCount: sql<number>`count(${reports.id})`.mapWith(Number),
-    latestAt:    sql<string | null>`max(${reports.publishedAt})`,
-  })
-  .from(districts)
-  .leftJoin(reports, and(
-    eq(districts.id, reports.districtId),
-    eq(reports.status, 'published'),
-  ))
-  .groupBy(districts.id, districts.name, districts.slug)
-  .orderBy(sql`count(${reports.id}) desc`)
-  .limit(8),
-
-  // 6. Category distribution
-  db.select({
-    category: reports.category,
-    count:    sql<number>`count(*)`.mapWith(Number),
-  })
-  .from(reports)
-  .where(eq(reports.status, 'published'))
-  .groupBy(reports.category),
-
-  // 7. Latest 4 reports for LiveCards
-  db.select({
-    title:        reports.title,
-    category:     reports.category,
-    publishedAt:  reports.publishedAt,
-    districtName: districts.name,
-  })
-  .from(reports)
-  .leftJoin(districts, eq(reports.districtId, districts.id))
-  .where(eq(reports.status, 'published'))
-  .orderBy(desc(reports.publishedAt))
-  .limit(4),
-]);
-
-// ── Transform query results ───────────────────────────────────────────────────
-
-const totalReports   = totalReportsRow?.n   ?? 0;
-const totalDistricts = totalDistrictsRow?.n  ?? 0;
-
-// Active this week
-const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-const activeReports = recentActivityRaw.filter(
-  r => r.publishedAt && r.publishedAt.getTime() > oneWeekAgo
-).length;
-
-// Featured reports for main column
-const featuredReports = featuredRaw.map(r => ({
-  title:       r.title,
-  excerpt:     r.summary,
-  slug:        r.slug,
-  district:    r.districtName ?? undefined,
-  publishedAt: r.publishedAt  ?? undefined,
-}));
-
-// LiveCards from recent reports (fall back to default if DB empty)
-const liveCards = recentActivityRaw.length > 0
-  ? recentActivityRaw.map(r => ({
-      category: CATEGORY_TO_CARD[r.category] ?? 'alert',
-      title:    r.title,
-      district: r.districtName ?? 'Madrid',
-      time:     fmtRelative(r.publishedAt),
-    }))
-  : undefined;
-
-// DistrictsGrid (use component default if no districts seeded)
-const districtItems = districtStatsRaw.length > 0
-  ? districtStatsRaw.map(d => ({
-      name:           d.name,
-      slug:           d.slug,
-      reportCount:    d.reportCount,
-      latestActivity: d.latestAt ? fmtRelative(d.latestAt) : undefined,
-    }))
-  : undefined;
-
-// CategoriesGrid (use component default if no data)
-const categoryItems = categoryStatsRaw.length > 0
-  ? categoryStatsRaw
-      .map(c => ({
-        ...(CATEGORY_DISPLAY[c.category] ?? { name: c.category, slug: c.category, color: '#9b8c7e' }),
-        count: c.count,
-      }))
-      .sort((a, b) => b.count - a.count)
-  : undefined;
-
-// Sidebar feed from recent news (fall back to component default)
-const feedItems = recentNewsRaw.length > 0
-  ? recentNewsRaw.map((item, i) => ({
-      text:  item.title,
-      time:  fmtRelative(item.publishedAt),
-      color: FEED_COLORS[i % FEED_COLORS.length],
-    }))
-  : undefined;
+// Map raw category stats to CategoriesGrid shape
+const categoryGridItems = categoryItems?.map(c => ({
+  ...(CATEGORY_DISPLAY[c.category] ?? { name: c.category, slug: c.category, color: '#9b8c7e' }),
+  count: c.count,
+})).sort((a, b) => b.count - a.count);
 ---
 
 <PublicDashboardLayout
@@ -223,7 +62,7 @@ const feedItems = recentNewsRaw.length > 0
   </div>
 
   <DistrictsGrid districts={districtItems} />
-  <CategoriesGrid categories={categoryItems} />
+  <CategoriesGrid categories={categoryGridItems} />
 </PublicDashboardLayout>
 
 <style>

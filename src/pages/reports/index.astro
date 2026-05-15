@@ -2,41 +2,10 @@
 import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
 import ReportCard from '../../components/ReportCard.astro';
 import EmptyState from '../../components/EmptyState.astro';
-import { db } from '../../db';
-import { reports, user, districts } from '../../db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { getAllPublishedReports } from '../../lib/data/queries';
+import { CATEGORY_DISPLAY } from '../../lib/content-labels';
 
-const CATEGORY_DISPLAY: Record<string, { name: string; color: string }> = {
-  urban_development: { name: 'Urbanismo',     color: '#c56b2d' },
-  transport:         { name: 'Transporte',     color: '#2563eb' },
-  culture:           { name: 'Cultura',        color: '#6d28d9' },
-  environment:       { name: 'Medio ambiente', color: '#166534' },
-  economy:           { name: 'Economía',       color: '#0891b2' },
-  safety:            { name: 'Seguridad',      color: '#b91c1c' },
-  health:            { name: 'Salud',          color: '#be185d' },
-  education:         { name: 'Educación',      color: '#65a30d' },
-  tourism:           { name: 'Turismo',        color: '#b45309' },
-  general:           { name: 'General',        color: '#9b8c7e' },
-};
-
-const [allReports, [{ n: total }]] = await Promise.all([
-  db.select({
-    title:        reports.title,
-    slug:         reports.slug,
-    summary:      reports.summary,
-    category:     reports.category,
-    publishedAt:  reports.publishedAt,
-    districtName: districts.name,
-  })
-  .from(reports)
-  .leftJoin(districts, eq(reports.districtId, districts.id))
-  .where(eq(reports.status, 'published'))
-  .orderBy(desc(reports.publishedAt)),
-
-  db.select({ n: sql<number>`count(*)`.mapWith(Number) })
-    .from(reports)
-    .where(eq(reports.status, 'published')),
-]);
+const { rows: allReports, total } = await getAllPublishedReports();
 ---
 
 <PublicDashboardLayout

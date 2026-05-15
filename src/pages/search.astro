@@ -2,81 +2,12 @@
 import PublicDashboardLayout from '../layouts/PublicDashboardLayout.astro';
 import ReportCard from '../components/ReportCard.astro';
 import EmptyState from '../components/EmptyState.astro';
-import { db } from '../db';
-import { reports, news, districts } from '../db/schema';
-import { eq, desc, or, ilike, and } from 'drizzle-orm';
+import { searchContent } from '../lib/data/queries';
+import { CATEGORY_DISPLAY } from '../lib/content-labels';
+import { fmtRelative } from '../lib/format';
 
 const q = (Astro.url.searchParams.get('q') ?? '').trim();
-
-function fmtRelative(d: Date | string | null | undefined): string {
-  if (!d) return '';
-  const date = typeof d === 'string' ? new Date(d) : d;
-  const diff = Math.floor((Date.now() - date.getTime()) / 60000);
-  if (diff < 1)    return 'Ahora mismo';
-  if (diff < 60)   return `Hace ${diff}m`;
-  if (diff < 1440) return `Hace ${Math.floor(diff / 60)}h`;
-  return `Hace ${Math.floor(diff / 1440)}d`;
-}
-
-const CATEGORY_DISPLAY: Record<string, string> = {
-  urban_development: 'Urbanismo',
-  transport:         'Transporte',
-  culture:           'Cultura',
-  environment:       'Medio ambiente',
-  economy:           'Economía',
-  safety:            'Seguridad',
-  health:            'Salud',
-  education:         'Educación',
-  tourism:           'Turismo',
-  general:           'General',
-};
-
-let reportResults: Array<{
-  title: string; slug: string; summary: string;
-  districtName: string | null; publishedAt: Date | null; category: string;
-}> = [];
-let newsResults: Array<{
-  title: string; slug: string; summary: string;
-  source: string | null; publishedAt: Date | null;
-}> = [];
-
-if (q.length >= 2) {
-  const pattern = `%${q}%`;
-  [reportResults, newsResults] = await Promise.all([
-    db.select({
-      title:        reports.title,
-      slug:         reports.slug,
-      summary:      reports.summary,
-      districtName: districts.name,
-      publishedAt:  reports.publishedAt,
-      category:     reports.category,
-    })
-    .from(reports)
-    .leftJoin(districts, eq(reports.districtId, districts.id))
-    .where(and(
-      eq(reports.status, 'published'),
-      or(ilike(reports.title, pattern), ilike(reports.summary, pattern)),
-    ))
-    .orderBy(desc(reports.publishedAt))
-    .limit(20),
-
-    db.select({
-      title:       news.title,
-      slug:        news.slug,
-      summary:     news.summary,
-      source:      news.source,
-      publishedAt: news.publishedAt,
-    })
-    .from(news)
-    .where(and(
-      eq(news.status, 'published'),
-      or(ilike(news.title, pattern), ilike(news.summary, pattern)),
-    ))
-    .orderBy(desc(news.publishedAt))
-    .limit(10),
-  ]);
-}
-
+const { reportResults, newsResults } = await searchContent(q);
 const totalResults = reportResults.length + newsResults.length;
 ---
 
