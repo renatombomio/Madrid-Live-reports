@@ -257,10 +257,31 @@ export async function getDistrictDetail(slug: string) {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-export async function searchContent(q: string) {
-  if (q.length < 2) return { reportResults: [], newsResults: [] };
+interface SearchParams {
+  q?: string;       // text query
+  category?: string; // report_category enum key
+}
 
-  const pattern = `%${q}%`;
+export async function searchContent({ q = '', category = '' }: SearchParams = {}) {
+  const trimmed  = q.trim();
+  const hasQuery = trimmed.length >= 2;
+
+  // Need at least one filter active
+  if (!hasQuery && !category) return { reportResults: [], newsResults: [] };
+
+  const pattern = `%${trimmed}%`;
+
+  const textCondition = hasQuery
+    ? or(
+        ilike(reports.title,   pattern),
+        ilike(reports.summary, pattern),
+        ilike(reports.content, pattern),
+      )
+    : undefined;
+
+  const catCondition = category
+    ? sql`${reports.category}::text = ${category}`
+    : undefined;
 
   const [reportResults, newsResults] = await Promise.all([
     db.select({
@@ -273,28 +294,74 @@ export async function searchContent(q: string) {
     })
     .from(reports)
     .leftJoin(districts, eq(reports.districtId, districts.id))
-    .where(and(
-      eq(reports.status, 'published'),
-      or(ilike(reports.title, pattern), ilike(reports.summary, pattern)),
-    ))
+    .where(and(eq(reports.status, 'published'), textCondition, catCondition))
     .orderBy(desc(reports.publishedAt))
-    .limit(20),
+    .limit(30),
 
-    db.select({
-      title:       news.title,
-      slug:        news.slug,
-      summary:     news.summary,
-      source:      news.source,
-      publishedAt: news.publishedAt,
-    })
-    .from(news)
-    .where(and(
-      eq(news.status, 'published'),
-      or(ilike(news.title, pattern), ilike(news.summary, pattern)),
-    ))
-    .orderBy(desc(news.publishedAt))
-    .limit(10),
+    // News: only search when text query is active (news has no category enum)
+    hasQuery
+      ? db.select({
+          title:       news.title,
+          slug:        news.slug,
+          summary:     news.summary,
+          source:      news.source,
+          publishedAt: news.publishedAt,
+        })
+        .from(news)
+        .where(and(
+          eq(news.status, 'published'),
+          or(ilike(news.title, pattern), ilike(news.summary, pattern)),
+        ))
+        .orderBy(desc(news.publishedAt))
+        .limit(10)
+      : Promise.resolve([] as Array<{
+          title: string; slug: string; summary: string;
+          source: string | null; publishedAt: Date | null;
+        }>),
   ]);
 
   return { reportResults, newsResults };
+}
+
+export async function getSearchSuggestions() {
+  const [recentReports, categoryStats, topDistricts] = await Promise.all([
+    db.select({
+      title:        reports.title,
+      slug:         reports.slug,
+      summary:      reports.summary,
+      category:     reports.category,
+      publishedAt:  reports.publishedAt,
+      districtName: districts.name,
+    })
+    .from(reports)
+    .leftJoin(districts, eq(reports.districtId, districts.id))
+    .where(eq(reports.status, 'published'))
+    .orderBy(desc(reports.publishedAt))
+    .limit(5),
+
+    db.select({
+      category: reports.category,
+      count:    sql<number>`count(*)`.mapWith(Number),
+    })
+    .from(reports)
+    .where(eq(reports.status, 'published'))
+    .groupBy(reports.category)
+    .orderBy(sql`count(*) desc`),
+
+    db.select({
+      name:        districts.name,
+      slug:        districts.slug,
+      reportCount: sql<number>`count(${reports.id})`.mapWith(Number),
+    })
+    .from(districts)
+    .leftJoin(reports, and(
+      eq(districts.id, reports.districtId),
+      eq(reports.status, 'published'),
+    ))
+    .groupBy(districts.id, districts.name, districts.slug)
+    .orderBy(sql`count(${reports.id}) desc`)
+    .limit(8),
+  ]);
+
+  return { recentReports, categoryStats, topDistricts };
 }

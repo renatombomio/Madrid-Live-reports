@@ -2,181 +2,446 @@
 import PublicDashboardLayout from '../layouts/PublicDashboardLayout.astro';
 import ReportCard from '../components/ReportCard.astro';
 import EmptyState from '../components/EmptyState.astro';
-import { searchContent } from '../lib/data/queries';
+import { searchContent, getSearchSuggestions } from '../lib/data/queries';
 import { CATEGORY_DISPLAY } from '../lib/content-labels';
 import { fmtRelative } from '../lib/format';
 
-const q = (Astro.url.searchParams.get('q') ?? '').trim();
-const { reportResults, newsResults } = await searchContent(q);
-const totalResults = reportResults.length + newsResults.length;
+const q        = (Astro.url.searchParams.get('q')        ?? '').trim();
+const category = (Astro.url.searchParams.get('category') ?? '').trim();
+
+const isSearching = q.length >= 2 || category !== '';
+
+const [{ reportResults, newsResults }, suggestions] = await Promise.all([
+  searchContent({ q, category }),
+  isSearching ? Promise.resolve(null) : getSearchSuggestions(),
+]);
+
+const totalResults   = reportResults.length + newsResults.length;
+const activeCategory = CATEGORY_DISPLAY[category];
+
+// Build a URL that preserves active filters
+function buildUrl(params: Record<string, string>) {
+  const p = new URLSearchParams();
+  if (params.q        ?? q)        p.set('q',        params.q        ?? q);
+  if (params.category ?? category) p.set('category', params.category ?? category);
+  if ('q'        in params && !params.q)        p.delete('q');
+  if ('category' in params && !params.category) p.delete('category');
+  const s = p.toString();
+  return s ? `/search?${s}` : '/search';
+}
+
+// Ordered categories by result count (or alphabetical if no query)
+const categoriesForChips = suggestions?.categoryStats.length
+  ? suggestions.categoryStats.map(c => ({ key: c.category, count: c.count, ...CATEGORY_DISPLAY[c.category]! }))
+  : Object.entries(CATEGORY_DISPLAY).map(([key, v]) => ({ key, count: 0, ...v }));
 ---
 
 <PublicDashboardLayout
-  title={q ? `Búsqueda: ${q} — Madrid Live Reports` : 'Buscar — Madrid Live Reports'}
-  description="Busca reportes y noticias sobre Madrid."
+  title={q ? `"${q}" — Buscar — Madrid Live` : category ? `${activeCategory?.name ?? category} — Madrid Live` : 'Explorar — Madrid Live Reports'}
+  description="Explora reportes y noticias sobre Madrid."
   showTicker={false}
 >
-  <div class="search-hero">
-    <div class="search-hero__inner">
-      <div class="search-label syne">Búsqueda</div>
-      <form method="get" action="/search" class="search-form" role="search">
+
+  <!-- ── Search header ──────────────────────────────────────────────────── -->
+  <div class="search-header">
+    <div class="search-header__inner">
+      <div class="search-header__breadcrumb syne">
+        <a href="/">Madrid Live</a>
+        <span aria-hidden="true">/</span>
+        <span>Explorar</span>
+      </div>
+
+      <form method="get" action="/search" role="search" class="search-form">
         <label for="search-input" class="sr-only">Buscar reportes y noticias</label>
-        <div class="search-wrap">
-          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+        {category && <input type="hidden" name="category" value={category} />}
+        <div class="search-bar">
+          <svg class="search-bar__icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
             aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input
             id="search-input"
-            class="search-input"
+            class="search-bar__input"
             type="search"
             name="q"
             value={q}
             placeholder="Buscar reportes, noticias, distritos…"
             autocomplete="off"
-            autofocus
+            autofocus={!isSearching}
           />
-          <button type="submit" class="search-btn syne">Buscar</button>
+          {(q || category) && (
+            <a href="/search" class="search-bar__clear" aria-label="Limpiar búsqueda" title="Limpiar">✕</a>
+          )}
+          <button type="submit" class="search-bar__btn syne">Buscar</button>
         </div>
       </form>
-      {q && (
-        <p class="search-meta">
-          {totalResults > 0
-            ? <>{totalResults} resultado{totalResults !== 1 ? 's' : ''} para <strong>"{q}"</strong></>
-            : <>Sin resultados para <strong>"{q}"</strong></>
-          }
-        </p>
+
+      <!-- Active filters row -->
+      {(q || category) && (
+        <div class="filters-row">
+          {q && (
+            <span class="filter-pill filter-pill--query">
+              "{q}"
+              <a href={buildUrl({ q: '' })} class="filter-pill__remove" aria-label="Quitar filtro de texto">✕</a>
+            </span>
+          )}
+          {category && activeCategory && (
+            <span class="filter-pill" style={`--cat-color: ${activeCategory.color}`}>
+              <span class="filter-pill__dot"></span>
+              {activeCategory.name}
+              <a href={buildUrl({ category: '' })} class="filter-pill__remove" aria-label="Quitar filtro de categoría">✕</a>
+            </span>
+          )}
+          {isSearching && totalResults > 0 && (
+            <span class="filter-count">
+              {totalResults} {totalResults === 1 ? 'resultado' : 'resultados'}
+            </span>
+          )}
+        </div>
       )}
+    </div>
+
+    <!-- Category chips -->
+    <div class="category-chips" role="navigation" aria-label="Filtrar por categoría">
+      <a
+        href={buildUrl({ category: '' })}
+        class:list={['chip', { 'chip--active': !category }]}
+      >
+        Todos
+      </a>
+      {categoriesForChips.map(cat => (
+        <a
+          href={buildUrl({ category: cat.key })}
+          class:list={['chip', { 'chip--active': category === cat.key }]}
+          style={category === cat.key ? `--chip-color: ${cat.color}` : ''}
+        >
+          {cat.name}
+          {cat.count > 0 && <span class="chip__count">{cat.count}</span>}
+        </a>
+      ))}
     </div>
   </div>
 
-  <div class="results-wrap">
-    {q.length < 2 && (
-      <EmptyState
-        icon="search"
-        title="Escribe para buscar"
-        message="Introduce al menos 2 caracteres para buscar entre reportes y noticias."
-      />
-    )}
-
-    {q.length >= 2 && totalResults === 0 && (
-      <EmptyState
-        icon="search"
-        title="Sin resultados"
-        message={`No encontramos reportes ni noticias que coincidan con "${q}". Prueba con otros términos.`}
-      />
-    )}
-
-    {reportResults.length > 0 && (
-      <section class="results-section">
-        <div class="results-section__head">
-          <span class="results-section__title syne">Reportes</span>
-          <span class="results-section__count">{reportResults.length}</span>
+  <!-- ── Discover state (no active search) ─────────────────────────────── -->
+  {!isSearching && suggestions && (
+    <div class="discover">
+      {suggestions.recentReports.length > 0 && (
+        <div class="discover__section">
+          <div class="discover__head">
+            <span class="discover__title syne">Últimas publicaciones</span>
+            <a href="/reports" class="discover__link">Ver todos →</a>
+          </div>
+          <div class="discover__reports">
+            {suggestions.recentReports.map(r => (
+              <ReportCard
+                title={r.title}
+                slug={r.slug}
+                excerpt={r.summary}
+                district={r.districtName ?? undefined}
+                publishedAt={r.publishedAt ?? undefined}
+                tags={[CATEGORY_DISPLAY[r.category]?.name ?? r.category]}
+              />
+            ))}
+          </div>
         </div>
-        {reportResults.map(r => (
-          <ReportCard
-            title={r.title}
-            slug={r.slug}
-            excerpt={r.summary}
-            district={r.districtName ?? undefined}
-            publishedAt={r.publishedAt ?? undefined}
-            tags={[CATEGORY_DISPLAY[r.category] ?? r.category]}
-          />
-        ))}
-      </section>
-    )}
+      )}
 
-    {newsResults.length > 0 && (
-      <section class="results-section">
-        <div class="results-section__head">
-          <span class="results-section__title syne">Noticias</span>
-          <span class="results-section__count">{newsResults.length}</span>
+      {suggestions.topDistricts.length > 0 && (
+        <div class="discover__section discover__section--districts">
+          <div class="discover__head">
+            <span class="discover__title syne">Explorar por distrito</span>
+            <a href="/districts" class="discover__link">Ver todos →</a>
+          </div>
+          <div class="district-chips">
+            {suggestions.topDistricts.filter(d => d.reportCount > 0).map(d => (
+              <a href={`/districts/${d.slug}`} class="district-chip-btn card-hover">
+                <span class="district-chip-btn__name syne">{d.name}</span>
+                <span class="district-chip-btn__count">{d.reportCount}</span>
+              </a>
+            ))}
+          </div>
         </div>
-        {newsResults.map(n => (
-          <article class="news-result card-hover">
-            <div class="news-result__meta">
-              {n.source && <span class="news-result__source">{n.source}</span>}
-              {n.publishedAt && <time class="news-result__time">{fmtRelative(n.publishedAt)}</time>}
-            </div>
-            <a href={`/news/${n.slug}`} class="news-result__title">{n.title}</a>
-            <p class="news-result__summary">{n.summary}</p>
-          </article>
-        ))}
-      </section>
-    )}
-  </div>
+      )}
+
+      {suggestions.recentReports.length === 0 && (
+        <EmptyState
+          icon="search"
+          title="Escribe para buscar"
+          message="Busca por título, resumen o contenido. Usa los filtros de categoría para explorar temas."
+        />
+      )}
+    </div>
+  )}
+
+  <!-- ── No results ─────────────────────────────────────────────────────── -->
+  {isSearching && totalResults === 0 && (
+    <div class="no-results">
+      <div class="no-results__inner">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+          aria-hidden="true" class="no-results__icon">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <line x1="8" y1="11" x2="14" y2="11"/>
+        </svg>
+        <h2 class="no-results__title syne">Sin resultados</h2>
+        <p class="no-results__msg">
+          {q && category
+            ? `No hay resultados para "${q}" en ${activeCategory?.name ?? category}.`
+            : q
+            ? `No encontramos resultados para "${q}".`
+            : `No hay reportes publicados en ${activeCategory?.name ?? category}.`
+          }
+        </p>
+        <div class="no-results__actions">
+          {category && <a href={buildUrl({ category: '' })} class="btn-secondary-sm">Buscar en todas las categorías</a>}
+          {q && <a href={buildUrl({ q: '' })} class="btn-secondary-sm">Quitar texto de búsqueda</a>}
+          <a href="/reports" class="btn-secondary-sm">Ver todos los reportes</a>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- ── Results ────────────────────────────────────────────────────────── -->
+  {isSearching && totalResults > 0 && (
+    <div class="results">
+      {reportResults.length > 0 && (
+        <section class="results-group">
+          <div class="results-group__head">
+            <span class="results-group__label syne">Reportes</span>
+            <span class="results-group__count">{reportResults.length}</span>
+          </div>
+          {reportResults.map(r => (
+            <ReportCard
+              title={r.title}
+              slug={r.slug}
+              excerpt={r.summary}
+              district={r.districtName ?? undefined}
+              publishedAt={r.publishedAt ?? undefined}
+              tags={[CATEGORY_DISPLAY[r.category]?.name ?? r.category]}
+            />
+          ))}
+        </section>
+      )}
+
+      {newsResults.length > 0 && (
+        <section class="results-group">
+          <div class="results-group__head">
+            <span class="results-group__label syne">Noticias</span>
+            <span class="results-group__count">{newsResults.length}</span>
+          </div>
+          {newsResults.map(n => (
+            <article class="news-row card-hover">
+              <div class="news-row__meta">
+                {n.source && <span class="news-row__source">{n.source}</span>}
+                {n.publishedAt && <time class="news-row__time">{fmtRelative(n.publishedAt)}</time>}
+              </div>
+              <a href={`/news/${n.slug}`} class="news-row__title syne">{n.title}</a>
+              <p class="news-row__summary">{n.summary}</p>
+            </article>
+          ))}
+        </section>
+      )}
+    </div>
+  )}
+
 </PublicDashboardLayout>
 
 <style>
-  .search-hero {
+  /* ── Search header ──────────────────────────────────────────────────────── */
+  .search-header {
     border-bottom: 1px solid var(--border);
-    padding: 2.5rem 1.5rem 2rem;
     background: var(--bg2);
   }
-  .search-hero__inner { max-width: 640px; }
-  .search-label {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--txt3); margin-bottom: 1rem;
+  .search-header__inner { padding: 2rem 1.5rem 1rem; max-width: 800px; }
+
+  .search-header__breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--txt3); margin-bottom: 1.25rem;
   }
-  .search-form { margin-bottom: 0.75rem; }
-  .search-wrap { position: relative; display: flex; align-items: center; gap: 8px; }
-  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--txt3); pointer-events: none; }
-  .search-input {
+  .search-header__breadcrumb a { color: var(--txt3); text-decoration: none; transition: color 0.15s; }
+  .search-header__breadcrumb a:hover { color: var(--accent); }
+
+  .search-form { margin-bottom: 0.875rem; }
+  .search-bar {
+    position: relative; display: flex; align-items: center; gap: 8px;
+  }
+  .search-bar__icon {
+    position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    color: var(--txt3); pointer-events: none; flex-shrink: 0;
+  }
+  .search-bar__input {
     flex: 1; background: var(--bg3); border: 1px solid var(--border2);
-    border-radius: var(--radius-sm); padding: 11px 12px 11px 38px;
+    border-radius: var(--radius-sm); padding: 11px 44px 11px 40px;
     font-size: 14px; font-family: 'Inter', sans-serif; color: var(--txt);
     outline: none; transition: border-color 0.15s, box-shadow 0.15s;
     box-shadow: var(--shadow-sm);
   }
-  .search-input::placeholder { color: var(--txt3); }
-  .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accentbg); }
-  .search-btn {
+  .search-bar__input::placeholder { color: var(--txt3); }
+  .search-bar__input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accentbg); }
+  .search-bar__clear {
+    position: absolute; right: 108px; top: 50%; transform: translateY(-50%);
+    font-size: 11px; color: var(--txt3); text-decoration: none; padding: 4px 6px;
+    border-radius: 4px; transition: color 0.15s, background 0.15s; line-height: 1;
+  }
+  .search-bar__clear:hover { color: var(--txt); background: var(--bg4); }
+  .search-bar__btn {
     background: var(--accent); color: #fff;
-    font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
     padding: 11px 20px; border-radius: var(--radius-sm); border: none;
     cursor: pointer; white-space: nowrap; transition: opacity 0.15s;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sm); flex-shrink: 0;
   }
-  .search-btn:hover { opacity: 0.85; }
-  .search-meta { font-size: 13px; color: var(--txt3); margin-top: 0.5rem; }
-  .search-meta strong { color: var(--txt2); font-weight: 500; }
+  .search-bar__btn:hover { opacity: 0.85; }
 
-  .results-wrap { max-width: 800px; padding: 0 1.5rem 3rem; margin: 0 auto; }
+  .filters-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 0.5rem;
+  }
+  .filter-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--bg4); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 3px 10px;
+    font-size: 11px; color: var(--txt2); font-family: 'Syne', sans-serif; font-weight: 600;
+  }
+  .filter-pill--query { background: var(--accentbg); border-color: var(--accentbd); color: var(--accent); }
+  .filter-pill__dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--cat-color, var(--accent)); flex-shrink: 0;
+  }
+  .filter-pill__remove {
+    font-size: 10px; color: inherit; text-decoration: none; opacity: 0.6;
+    margin-left: 2px; transition: opacity 0.15s; line-height: 1;
+  }
+  .filter-pill__remove:hover { opacity: 1; }
+  .filter-count { font-size: 11px; color: var(--txt3); margin-left: 4px; }
 
-  .results-section { margin-top: 2rem; }
-  .results-section__head {
+  /* ── Category chips ─────────────────────────────────────────────────────── */
+  .category-chips {
+    display: flex; gap: 6px; padding: 0.75rem 1.5rem;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .category-chips::-webkit-scrollbar { display: none; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    white-space: nowrap; font-size: 11px; font-weight: 600;
+    font-family: 'Syne', sans-serif; letter-spacing: 0.04em;
+    padding: 5px 12px; border-radius: 20px; text-decoration: none;
+    border: 1px solid var(--border2); color: var(--txt2); background: var(--bg);
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    flex-shrink: 0;
+  }
+  .chip:hover { color: var(--txt); border-color: var(--border3); background: var(--bg3); }
+  .chip--active {
+    background: var(--chip-color, var(--accent));
+    border-color: var(--chip-color, var(--accent));
+    color: #fff;
+  }
+  .chip--active:hover { opacity: 0.88; color: #fff; }
+  .chip__count {
+    font-size: 9px; opacity: 0.7; font-weight: 700;
+    background: rgba(0,0,0,0.12); border-radius: 8px; padding: 1px 5px;
+  }
+
+  /* ── Discover state ─────────────────────────────────────────────────────── */
+  .discover { }
+  .discover__section { border-top: 1px solid var(--border); }
+  .discover__section--districts { background: var(--bg2); }
+  .discover__head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.25rem 1.5rem 0.75rem;
+  }
+  .discover__title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt2); }
+  .discover__link { font-size: 12px; color: var(--accent); text-decoration: none; transition: opacity 0.15s; }
+  .discover__link:hover { opacity: 0.75; }
+  .discover__reports { }
+
+  .district-chips { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 1.5rem 1.5rem; }
+  .district-chip-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 8px 14px;
+    text-decoration: none;
+  }
+  .district-chip-btn__name { font-size: 12px; font-weight: 700; color: var(--txt); transition: color 0.15s; }
+  .district-chip-btn:hover .district-chip-btn__name { color: var(--accent); }
+  .district-chip-btn__count {
+    font-size: 10px; color: var(--txt3);
+    background: var(--bg4); border-radius: 8px; padding: 1px 6px;
+    font-family: 'Syne', sans-serif; font-weight: 700;
+  }
+
+  /* ── No results ─────────────────────────────────────────────────────────── */
+  .no-results { padding: 4rem 1.5rem; display: flex; justify-content: center; }
+  .no-results__inner { max-width: 480px; text-align: center; }
+  .no-results__icon { color: var(--txt3); margin: 0 auto 1.25rem; display: block; }
+  .no-results__title { font-size: 18px; font-weight: 800; color: var(--txt2); margin-bottom: 0.5rem; letter-spacing: -0.2px; }
+  .no-results__msg { font-size: 13px; color: var(--txt3); line-height: 1.65; margin-bottom: 1.5rem; }
+  .no-results__actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .btn-secondary-sm {
+    font-size: 12px; font-weight: 500; color: var(--txt2); text-decoration: none;
+    border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 7px 14px;
+    background: var(--bg); transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-secondary-sm:hover { color: var(--txt); border-color: var(--border3); }
+
+  /* ── Results ────────────────────────────────────────────────────────────── */
+  .results { border-top: 1px solid var(--border); }
+  .results-group { }
+  .results-group__head {
     display: flex; align-items: center; gap: 10px;
-    padding-bottom: 0.75rem; margin-bottom: 0.5rem;
+    padding: 1.25rem 1.5rem 0.75rem;
     border-bottom: 1px solid var(--border);
+    position: sticky; top: 56px; z-index: 10;
+    background: var(--bg2);
   }
-  .results-section__title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--txt2); }
-  .results-section__count {
+  .results-group__label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--txt2); }
+  .results-group__count {
     font-size: 10px; font-weight: 700; color: var(--accent);
     background: var(--accentbg); border: 1px solid var(--accentbd);
-    border-radius: 10px; padding: 1px 7px;
+    border-radius: 10px; padding: 1px 8px;
   }
 
-  .news-result {
-    background: var(--bg2); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 8px;
+  .news-row {
+    border-bottom: 1px solid var(--border); padding: 1.25rem 1.5rem;
+    background: var(--bg);
   }
-  .news-result__meta { display: flex; gap: 10px; align-items: center; margin-bottom: 0.5rem; }
-  .news-result__source {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  .news-row:last-child { border-bottom: none; }
+  .news-row__meta { display: flex; gap: 10px; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; }
+  .news-row__source {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
     color: var(--accent); background: var(--accentbg); border: 1px solid var(--accentbd);
-    border-radius: 4px; padding: 2px 7px;
+    border-radius: 4px; padding: 2px 6px;
   }
-  .news-result__time { font-size: 11px; color: var(--txt3); }
-  .news-result__title {
-    display: block; font-size: 15px; font-weight: 600; color: var(--txt);
-    text-decoration: none; line-height: 1.4; margin-bottom: 0.5rem;
-    transition: color 0.15s;
+  .news-row__time { font-size: 11px; color: var(--txt3); }
+  .news-row__title {
+    display: block; font-size: 14px; font-weight: 700; color: var(--txt);
+    text-decoration: none; line-height: 1.4; margin-bottom: 0.4rem; transition: color 0.15s;
   }
-  .news-result__title:hover { color: var(--accent); }
-  .news-result__summary { font-size: 13px; color: var(--txt3); line-height: 1.6; }
+  .news-row__title:hover { color: var(--accent); }
+  .news-row__summary { font-size: 12px; color: var(--txt3); line-height: 1.6; }
 
   .sr-only {
     position: absolute; width: 1px; height: 1px;
     padding: 0; margin: -1px; overflow: hidden;
     clip: rect(0,0,0,0); white-space: nowrap; border: 0;
   }
+
+  @media (max-width: 600px) {
+    .search-bar__clear { right: 84px; }
+    .search-bar__btn { padding: 11px 14px; font-size: 11px; }
+  }
 </style>
+
+<script>
+  // ⌘K focuses the search input from anywhere on this page
+  const input = document.getElementById('search-input') as HTMLInputElement | null;
+  if (input) {
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        input.focus();
+        input.select();
+      }
+    });
+  }
+</script>
