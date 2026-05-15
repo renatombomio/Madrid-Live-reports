@@ -1,40 +1,160 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import ReportCard from '../../components/ReportCardList.astro';
+import PublicDashboardLayout from '../../layouts/PublicDashboardLayout.astro';
+import ReportCard from '../../components/ReportCard.astro';
+import EmptyState from '../../components/EmptyState.astro';
 import { db } from '../../db';
 import { reports, user, districts } from '../../db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 
-const allReports = await db
-  .select({
-    id: reports.id,
-    title: reports.title,
-    slug: reports.slug,
-    summary: reports.summary,
-    category: reports.category,
-    coverImage: reports.coverImage,
-    publishedAt: reports.publishedAt,
-    authorName: user.name,
+const CATEGORY_DISPLAY: Record<string, { name: string; color: string }> = {
+  urban_development: { name: 'Urbanismo',     color: '#c56b2d' },
+  transport:         { name: 'Transporte',     color: '#2563eb' },
+  culture:           { name: 'Cultura',        color: '#6d28d9' },
+  environment:       { name: 'Medio ambiente', color: '#166534' },
+  economy:           { name: 'Economía',       color: '#0891b2' },
+  safety:            { name: 'Seguridad',      color: '#b91c1c' },
+  health:            { name: 'Salud',          color: '#be185d' },
+  education:         { name: 'Educación',      color: '#65a30d' },
+  tourism:           { name: 'Turismo',        color: '#b45309' },
+  general:           { name: 'General',        color: '#9b8c7e' },
+};
+
+const [allReports, [{ n: total }]] = await Promise.all([
+  db.select({
+    title:        reports.title,
+    slug:         reports.slug,
+    summary:      reports.summary,
+    category:     reports.category,
+    publishedAt:  reports.publishedAt,
     districtName: districts.name,
   })
   .from(reports)
-  .innerJoin(user, eq(reports.authorId, user.id))
   .leftJoin(districts, eq(reports.districtId, districts.id))
   .where(eq(reports.status, 'published'))
-  .orderBy(desc(reports.publishedAt));
+  .orderBy(desc(reports.publishedAt)),
+
+  db.select({ n: sql<number>`count(*)`.mapWith(Number) })
+    .from(reports)
+    .where(eq(reports.status, 'published')),
+]);
 ---
 
-<BaseLayout title="Informes" description="Análisis en profundidad sobre Madrid.">
-  <h1 class="text-4xl font-bold mb-2">Informes</h1>
-  <p class="text-gray-500 mb-10">Análisis en profundidad sobre la ciudad de Madrid.</p>
-
-  {allReports.length > 0 ? (
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {allReports.map((report) => (
-        <ReportCard {...report} />
-      ))}
+<PublicDashboardLayout
+  title="Reportes — Madrid Live Reports"
+  description="Análisis en profundidad sobre transporte, urbanismo, cultura y vida en Madrid."
+  showTicker={false}
+>
+  <div class="page-header">
+    <div class="page-header__inner">
+      <div class="page-header__breadcrumb syne">
+        <a href="/">Madrid Live</a>
+        <span aria-hidden="true">/</span>
+        <span>Reportes</span>
+      </div>
+      <h1 class="page-header__title syne">Reportes</h1>
+      <p class="page-header__sub">
+        Análisis en profundidad sobre los {total} distritos de Madrid.
+        {total > 0 && <span class="page-header__count">{total} publicados</span>}
+      </p>
     </div>
-  ) : (
-    <p class="text-gray-400 text-center py-24">No hay informes publicados todavía.</p>
-  )}
-</BaseLayout>
+  </div>
+
+  <div class="reports-layout">
+    <main class="reports-main">
+      {allReports.length > 0 ? (
+        <div class="reports-list">
+          {allReports.map(r => (
+            <ReportCard
+              title={r.title}
+              slug={r.slug}
+              excerpt={r.summary}
+              district={r.districtName ?? undefined}
+              publishedAt={r.publishedAt ?? undefined}
+              tags={[CATEGORY_DISPLAY[r.category]?.name ?? r.category]}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon="reports"
+          title="Sin reportes publicados"
+          message="Aún no hay reportes publicados. Publícalos desde el panel de administración."
+          action={{ label: 'Ir al admin', href: '/admin' }}
+        />
+      )}
+    </main>
+
+    <aside class="reports-sidebar">
+      <div class="sidebar-block">
+        <div class="sidebar-block__head syne">Categorías</div>
+        {Object.entries(CATEGORY_DISPLAY).map(([key, cat]) => (
+          <div class="cat-item">
+            <span class="cat-dot" style={`background:${cat.color}`}></span>
+            <span class="cat-name">{cat.name}</span>
+          </div>
+        ))}
+      </div>
+    </aside>
+  </div>
+</PublicDashboardLayout>
+
+<style>
+  .page-header {
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 1.5rem 2rem;
+    background: var(--bg2);
+  }
+  .page-header__inner { max-width: 800px; }
+  .page-header__breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--txt3); margin-bottom: 1rem;
+  }
+  .page-header__breadcrumb a { color: var(--txt3); text-decoration: none; transition: color 0.15s; }
+  .page-header__breadcrumb a:hover { color: var(--accent); }
+  .page-header__title {
+    font-size: clamp(24px, 4vw, 36px); font-weight: 800;
+    letter-spacing: -0.5px; color: var(--txt); margin-bottom: 0.5rem;
+  }
+  .page-header__sub { font-size: 13px; color: var(--txt2); display: flex; align-items: center; gap: 10px; }
+  .page-header__count {
+    font-size: 10px; font-weight: 700; color: var(--accent);
+    background: var(--accentbg); border: 1px solid var(--accentbd);
+    border-radius: 10px; padding: 2px 8px; letter-spacing: 0.04em;
+  }
+
+  .reports-layout {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    border-top: 1px solid var(--border);
+  }
+
+  .reports-main { border-right: 1px solid var(--border); }
+  .reports-list { }
+
+  .reports-sidebar { background: var(--bg); }
+
+  .sidebar-block { }
+  .sidebar-block__head {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--txt3);
+    padding: 1rem 1.25rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .cat-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0.6rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .cat-item:last-child { border-bottom: none; }
+  .cat-item:hover { background: var(--bg2); }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cat-name { font-size: 12px; color: var(--txt2); }
+
+  @media (max-width: 768px) {
+    .reports-layout { grid-template-columns: 1fr; }
+    .reports-main { border-right: none; }
+    .reports-sidebar { display: none; }
+  }
+</style>
