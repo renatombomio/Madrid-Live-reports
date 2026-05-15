@@ -49,9 +49,13 @@ const tabUrl = (s: string) => s === 'all' ? '/admin/reports' : `/admin/reports?s
     </div>
 
     {allReports.length === 0 ? (
-      <div class="adm-panel-empty" style="padding: 3rem 1.25rem; text-align: center;">
-        <p style="color: var(--adm-txt3); margin-bottom: 1rem;">
-          {statusFilter === 'all' ? 'No hay reportes todavía.' : `No hay reportes ${statusFilter === 'published' ? 'publicados' : statusFilter === 'draft' ? 'en borrador' : 'archivados'}.`}
+      <div style="padding: 3rem 1.25rem; text-align: center;">
+        <p style="color: var(--adm-txt3); margin-bottom: 1rem; font-size: 13px;">
+          {statusFilter === 'all'
+            ? 'No hay reportes todavía.'
+            : statusFilter === 'published' ? 'No hay reportes publicados.'
+            : statusFilter === 'draft'     ? 'No hay borradores.'
+            : 'No hay reportes archivados.'}
         </p>
         {statusFilter === 'all' && <a href="/admin/reports/new" class="adm-btn adm-btn--sm">Crear el primero →</a>}
       </div>
@@ -60,6 +64,9 @@ const tabUrl = (s: string) => s === 'all' ? '/admin/reports' : `/admin/reports?s
         <table class="adm-table">
           <thead>
             <tr>
+              <th class="col-check">
+                <input type="checkbox" id="check-all" class="adm-check" title="Seleccionar todo" />
+              </th>
               <th>Título</th>
               <th class="col-cat">Categoría</th>
               <th>Estado</th>
@@ -70,6 +77,9 @@ const tabUrl = (s: string) => s === 'all' ? '/admin/reports' : `/admin/reports?s
           <tbody>
             {allReports.map(report => (
               <tr data-id={report.id} data-status={report.status}>
+                <td class="col-check">
+                  <input type="checkbox" class="adm-check row-check" title="Seleccionar" />
+                </td>
                 <td>
                   <div class="rp-title">{report.title}</div>
                   <div class="rp-meta">
@@ -98,6 +108,7 @@ const tabUrl = (s: string) => s === 'all' ? '/admin/reports' : `/admin/reports?s
                     <button class="adm-action adm-action--publish publish-btn">
                       {report.status === 'published' ? 'Despublicar' : 'Publicar'}
                     </button>
+                    <button class="adm-action duplicate-btn" title="Duplicar como borrador">Duplicar</button>
                     <button class="adm-action adm-action--danger delete-btn">Borrar</button>
                   </div>
                 </td>
@@ -109,6 +120,14 @@ const tabUrl = (s: string) => s === 'all' ? '/admin/reports' : `/admin/reports?s
     )}
   </div>
 
+  <!-- Bulk action bar (shown when items selected) -->
+  <div id="bulk-bar" role="toolbar" aria-label="Acciones en lote">
+    <span class="bulk-count" id="bulk-count">0 seleccionados</span>
+    <button class="bulk-action bulk-action--publish" id="bulk-publish">Publicar</button>
+    <button class="bulk-action" id="bulk-archive">Archivar</button>
+    <button class="bulk-dismiss" id="bulk-dismiss" aria-label="Cancelar selección">×</button>
+  </div>
+
 </AdminLayout>
 
 <style>
@@ -117,73 +136,158 @@ const tabUrl = (s: string) => s === 'all' ? '/admin/reports' : `/admin/reports?s
     gap: 1rem; flex-wrap: wrap;
   }
   .rp-table-wrap { overflow-x: auto; }
-  .col-cat     { width: 130px; }
+  .col-check   { width: 40px; }
+  .col-cat     { width: 120px; }
   .col-date    { width: 140px; }
-  .col-actions { width: 210px; }
+  .col-actions { width: 240px; }
 
+  .adm-check { accent-color: var(--adm-accent); cursor: pointer; width: 14px; height: 14px; }
   .rp-title { font-size: 13px; font-weight: 600; color: var(--adm-txt); line-height: 1.4; }
   .rp-meta  { display: flex; gap: 8px; margin-top: 2px; font-size: 11px; color: var(--adm-txt3); flex-wrap: wrap; }
   .rp-cat   { font-size: 11px; color: var(--cat, var(--adm-txt3)); font-weight: 500; }
   .rp-date  { font-size: 11px; color: var(--adm-txt3); white-space: nowrap; }
   .rp-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
-
-  .adm-panel-empty { font-size: 12px; color: var(--adm-txt3); }
 </style>
 
 <script>
+  const t = (window as any).toast as (msg: string, type?: string) => void;
+  const toast = (msg: string, type: string = 'success') => {
+    // toast() is defined in AdminLayout — may not be ready yet on first tick
+    requestAnimationFrame(() => (window as any).toast?.(msg, type));
+  };
+
+  // ── Single publish toggle ───────────────────────────────────────────────────
   document.querySelectorAll<HTMLButtonElement>('.publish-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const row = btn.closest('tr') as HTMLTableRowElement;
       const id = row.dataset.id!;
-      const currentStatus = row.dataset.status!;
-      const nextStatus = currentStatus === 'published' ? 'draft' : 'published';
+      const cur = row.dataset.status!;
+      const next = cur === 'published' ? 'draft' : 'published';
 
-      btn.textContent = '…';
-      btn.disabled = true;
-
+      btn.textContent = '…'; btn.disabled = true;
       const res = await fetch(`/api/admin/reports/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: nextStatus }),
+        body: JSON.stringify({ status: next }),
       });
-
       if (res.ok) {
-        row.dataset.status = nextStatus;
+        row.dataset.status = next;
         const badge = row.querySelector('.adm-badge') as HTMLElement;
         if (badge) {
-          badge.className = `adm-badge adm-badge--${nextStatus}`;
-          const label = nextStatus === 'published' ? 'Publicado' : nextStatus === 'draft' ? 'Borrador' : 'Archivado';
-          badge.innerHTML = `<span class="adm-badge__dot"></span>${label}`;
+          badge.className = `adm-badge adm-badge--${next}`;
+          badge.innerHTML = `<span class="adm-badge__dot"></span>${next === 'published' ? 'Publicado' : 'Borrador'}`;
         }
-        btn.textContent = nextStatus === 'published' ? 'Despublicar' : 'Publicar';
+        btn.textContent = next === 'published' ? 'Despublicar' : 'Publicar';
+        toast(next === 'published' ? 'Publicado correctamente' : 'Movido a borradores');
       } else {
-        alert('No se pudo cambiar el estado.');
-        btn.textContent = currentStatus === 'published' ? 'Despublicar' : 'Publicar';
+        toast('No se pudo cambiar el estado', 'error');
+        btn.textContent = cur === 'published' ? 'Despublicar' : 'Publicar';
       }
       btn.disabled = false;
     });
   });
 
+  // ── Duplicate ───────────────────────────────────────────────────────────────
+  document.querySelectorAll<HTMLButtonElement>('.duplicate-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('tr') as HTMLTableRowElement;
+      const id = row.dataset.id!;
+      btn.textContent = '…'; btn.disabled = true;
+      const res = await fetch('/api/admin/reports/duplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        const { id: newId } = await res.json() as { id: string };
+        toast('Copia creada como borrador');
+        window.location.href = `/admin/reports/${newId}/edit`;
+      } else {
+        toast('No se pudo duplicar', 'error');
+        btn.textContent = 'Duplicar'; btn.disabled = false;
+      }
+    });
+  });
+
+  // ── Delete ──────────────────────────────────────────────────────────────────
   document.querySelectorAll<HTMLButtonElement>('.delete-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const row = btn.closest('tr') as HTMLTableRowElement;
       const id = row.dataset.id!;
       const title = row.querySelector<HTMLElement>('.rp-title')?.textContent?.trim();
-
       if (!confirm(`¿Borrar "${title}"? Esta acción no se puede deshacer.`)) return;
-      btn.textContent = '…';
-      btn.disabled = true;
-
+      btn.textContent = '…'; btn.disabled = true;
       const res = await fetch(`/api/admin/reports/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        row.style.transition = 'opacity 0.25s';
+        row.style.transition = 'opacity 0.2s';
         row.style.opacity = '0';
-        setTimeout(() => row.remove(), 250);
+        setTimeout(() => { row.remove(); updateBulkCount(); }, 200);
+        toast('Reporte borrado');
       } else {
-        alert('No se pudo borrar.');
-        btn.textContent = 'Borrar';
-        btn.disabled = false;
+        toast('No se pudo borrar', 'error');
+        btn.textContent = 'Borrar'; btn.disabled = false;
       }
     });
   });
+
+  // ── Bulk select ─────────────────────────────────────────────────────────────
+  const bulkBar   = document.getElementById('bulk-bar')!;
+  const bulkCount = document.getElementById('bulk-count')!;
+  const checkAll  = document.getElementById('check-all') as HTMLInputElement | null;
+
+  function getSelected() {
+    return Array.from(document.querySelectorAll<HTMLInputElement>('.row-check:checked'))
+      .map(cb => (cb.closest('tr') as HTMLTableRowElement).dataset.id!)
+      .filter(Boolean);
+  }
+
+  function updateBulkCount() {
+    const n = getSelected().length;
+    bulkCount.textContent = `${n} ${n === 1 ? 'seleccionado' : 'seleccionados'}`;
+    bulkBar.classList.toggle('visible', n > 0);
+  }
+
+  document.querySelectorAll<HTMLInputElement>('.row-check').forEach(cb => {
+    cb.addEventListener('change', updateBulkCount);
+  });
+
+  checkAll?.addEventListener('change', () => {
+    document.querySelectorAll<HTMLInputElement>('.row-check').forEach(cb => {
+      cb.checked = checkAll.checked;
+    });
+    updateBulkCount();
+  });
+
+  document.getElementById('bulk-dismiss')?.addEventListener('click', () => {
+    document.querySelectorAll<HTMLInputElement>('.row-check').forEach(cb => { cb.checked = false; });
+    if (checkAll) checkAll.checked = false;
+    updateBulkCount();
+  });
+
+  async function bulkAction(action: 'publish' | 'archive') {
+    const ids = getSelected();
+    if (ids.length === 0) return;
+    const label = action === 'publish' ? 'Publicando…' : 'Archivando…';
+    const btn = action === 'publish'
+      ? document.getElementById('bulk-publish') as HTMLButtonElement
+      : document.getElementById('bulk-archive') as HTMLButtonElement;
+    btn.textContent = label; btn.disabled = true;
+
+    const res = await fetch('/api/admin/reports/bulk', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, action }),
+    });
+    if (res.ok) {
+      toast(`${ids.length} ${ids.length === 1 ? 'reporte' : 'reportes'} ${action === 'publish' ? 'publicados' : 'archivados'}`);
+      window.location.reload();
+    } else {
+      toast('Error en la operación', 'error');
+      btn.textContent = action === 'publish' ? 'Publicar' : 'Archivar';
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('bulk-publish')?.addEventListener('click', () => bulkAction('publish'));
+  document.getElementById('bulk-archive')?.addEventListener('click', () => bulkAction('archive'));
 </script>

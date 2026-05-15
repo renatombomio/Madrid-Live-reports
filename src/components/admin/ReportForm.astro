@@ -27,7 +27,8 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
       ← Volver a informes
     </a>
     <div class="flex items-center gap-3">
-      <span id="form-status" class="text-sm text-gray-400 hidden"></span>
+      <span id="autosave-status" class="text-xs text-gray-400" aria-live="polite"></span>
+      <kbd class="form-kbd-hint" title="Guardar borrador">⌘S</kbd>
       <button
         type="button"
         id="btn-draft"
@@ -44,6 +45,14 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
       </button>
     </div>
   </div>
+
+  <!-- Restore-draft banner (new reports only, shown by JS if local draft exists) -->
+  {!isEdit && (
+    <div id="restore-banner" class="hidden mb-6 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 flex items-center justify-between gap-3">
+      <span>Hay un borrador guardado localmente. <button id="restore-btn" class="underline font-medium hover:no-underline">Restaurar</button></span>
+      <button id="restore-dismiss" class="text-amber-600 hover:text-amber-900 text-xs border border-amber-300 rounded px-2 py-0.5 transition-colors">Descartar</button>
+    </div>
+  )}
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
     <!-- ── Main column ──────────────────────────────────────── -->
@@ -255,10 +264,19 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
   <div id="error-banner" class="hidden mt-6 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700"></div>
 </form>
 
+<style>
+  .form-kbd-hint {
+    font-size: 10px; color: #9ca3af; background: #f9fafb;
+    border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 6px;
+    font-family: inherit; display: inline-block;
+  }
+</style>
+
 <script define:vars={{ submitUrl, submitMethod, isEdit }}>
   // ── Slug auto-generation ──────────────────────────────────────────────────
   const titleEl = document.getElementById('title');
   const slugEl = document.getElementById('slug');
+  const summaryEl = document.getElementById('summary');
   let slugEdited = slugEl.value.length > 0 && isEdit;
 
   function clientSlugify(text) {
@@ -333,11 +351,69 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
     });
   });
 
+  // ── Autosave (new reports only) ──────────────────────────────────────────
+  const DRAFT_KEY = 'adm-draft-new';
+  const autosaveStatus = document.getElementById('autosave-status');
+  let autosaveTimer = null;
+
+  function setAutosaveLabel(msg) {
+    if (!autosaveStatus) return;
+    autosaveStatus.textContent = msg;
+    if (msg) setTimeout(() => { autosaveStatus.textContent = ''; }, 3000);
+  }
+
+  function saveLocally() {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      title: titleEl.value,
+      slug: slugEl.value,
+      summary: summaryEl.value,
+      content: contentEl.value,
+      ts: Date.now(),
+    }));
+    setAutosaveLabel('Guardado localmente');
+  }
+
+  if (!isEdit) {
+    // Offer restore if local draft exists
+    try {
+      const stored = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (stored?.title) {
+        const banner = document.getElementById('restore-banner');
+        if (banner) {
+          banner.classList.remove('hidden');
+          document.getElementById('restore-btn')?.addEventListener('click', () => {
+            titleEl.value    = stored.title   || '';
+            slugEl.value     = stored.slug    || '';
+            summaryEl.value  = stored.summary || '';
+            contentEl.value  = stored.content || '';
+            slugEdited = Boolean(stored.slug);
+            banner.classList.add('hidden');
+            setAutosaveLabel('Borrador restaurado');
+          });
+          document.getElementById('restore-dismiss')?.addEventListener('click', () => {
+            localStorage.removeItem(DRAFT_KEY);
+            banner.classList.add('hidden');
+          });
+        }
+      }
+    } catch {}
+
+    // Schedule autosave on changes
+    [titleEl, summaryEl, contentEl].forEach(el => {
+      el.addEventListener('input', () => {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(saveLocally, 4000);
+      });
+    });
+  }
+
   // ── Form submission ───────────────────────────────────────────────────────
   const errorBanner = document.getElementById('error-banner');
-  const formStatus = document.getElementById('form-status');
   const statusInput = document.getElementById('status-input');
   const statusBadge = document.getElementById('status-badge');
+
+  const toast = (msg, type = 'success') =>
+    requestAnimationFrame(() => (window).toast?.(msg, type));
 
   function showError(msg) {
     errorBanner.textContent = msg;
@@ -345,39 +421,31 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function showStatus(msg) {
-    formStatus.textContent = msg;
-    formStatus.classList.remove('hidden');
-    setTimeout(() => formStatus.classList.add('hidden'), 3000);
-  }
-
   async function submit(targetStatus) {
     errorBanner.classList.add('hidden');
     statusInput.value = targetStatus;
 
-    const title = document.getElementById('title').value.trim();
-    const summary = document.getElementById('summary').value.trim();
+    const title   = titleEl.value.trim();
+    const summary = summaryEl.value.trim();
     const content = contentEl.value.trim();
 
-    if (!title) return showError('El título es obligatorio.');
+    if (!title)   return showError('El título es obligatorio.');
     if (!summary) return showError('El resumen es obligatorio.');
     if (!content) return showError('El contenido es obligatorio.');
 
     const tags = [...document.querySelectorAll('input[name="tags"]:checked')].map(el => el.value);
-
     const payload = {
-      title,
+      title, summary, content,
       slug: slugEl.value.trim() || undefined,
-      summary,
-      content,
       category: document.getElementById('category').value,
       districtId: document.getElementById('districtId').value || null,
       coverImage: document.getElementById('coverImage').value.trim() || null,
-      status: targetStatus,
-      tags,
+      status: targetStatus, tags,
     };
 
-    const btn = targetStatus === 'published' ? document.getElementById('btn-publish') : document.getElementById('btn-draft');
+    const btn = targetStatus === 'published'
+      ? document.getElementById('btn-publish')
+      : document.getElementById('btn-draft');
     const originalText = btn.textContent;
     btn.textContent = 'Guardando…';
     btn.disabled = true;
@@ -388,29 +456,23 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        showError(data.error ?? `Error ${res.status}`);
-        return;
-      }
+      if (!res.ok) { showError(data.error ?? `Error ${res.status}`); return; }
 
       if (!isEdit) {
-        // After create, redirect to the edit page
+        localStorage.removeItem(DRAFT_KEY);
         window.location.href = `/admin/reports/${data.id}/edit`;
       } else {
-        showStatus(targetStatus === 'published' ? '✓ Publicado' : '✓ Guardado');
-        // Update status badge
+        // Update status badge inline
         statusBadge.textContent = targetStatus === 'published' ? 'Publicado' : 'Borrador';
         statusBadge.className = `inline-block text-xs font-medium px-2 py-1 rounded ${
           targetStatus === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
         }`;
-        // Sync the publish button label
         document.getElementById('btn-publish').textContent =
           targetStatus === 'published' ? 'Actualizar' : 'Publicar';
+        toast(targetStatus === 'published' ? 'Publicado correctamente' : 'Guardado como borrador');
       }
-    } catch (err) {
+    } catch {
       showError('Error de red. Inténtalo de nuevo.');
     } finally {
       btn.textContent = originalText;
@@ -420,4 +482,12 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
 
   document.getElementById('btn-draft').addEventListener('click', () => submit('draft'));
   document.getElementById('btn-publish').addEventListener('click', () => submit('published'));
+
+  // ── ⌘S shortcut ─────────────────────────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      submit('draft');
+    }
+  });
 </script>
