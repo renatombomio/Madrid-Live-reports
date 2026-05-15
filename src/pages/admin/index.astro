@@ -1,80 +1,216 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminLayout from '../../layouts/AdminLayout.astro';
 import { auth } from '../../lib/auth';
-import { db } from '../../db';
-import { reports, news } from '../../db/schema';
-import { count, eq } from 'drizzle-orm';
+import { getAdminOverview } from '../../lib/data/admin-queries';
+import { CATEGORY_DISPLAY } from '../../lib/content-labels';
+import { fmtRelative } from '../../lib/format';
 
-// Auth guard — redirect unauthenticated users to login
 const session = await auth.api.getSession({ headers: Astro.request.headers });
 if (!session) return Astro.redirect('/admin/login');
-
-// Only admins and editors reach this page
 if (session.user.role === 'viewer') return Astro.redirect('/');
 
-const [[reportCounts], [newsCounts]] = await Promise.all([
-  db
-    .select({
-      published: count(eq(reports.status, 'published')),
-      draft: count(eq(reports.status, 'draft')),
-    })
-    .from(reports),
-  db
-    .select({
-      published: count(eq(news.status, 'published')),
-      draft: count(eq(news.status, 'draft')),
-    })
-    .from(news),
-]);
+const data = await getAdminOverview();
+
+const maxCatCount = Math.max(...data.categoryWeek.map(c => c.count), 1);
+const fmtDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' });
 ---
 
-<BaseLayout title="Admin">
-  <div class="max-w-4xl mx-auto">
-    <div class="flex items-center justify-between mb-8">
-      <h1 class="text-3xl font-bold">Panel de administración</h1>
-      <span class="text-sm text-gray-500">
-        Bienvenido, <strong>{session.user.name}</strong> ({session.user.role})
-      </span>
-    </div>
+<AdminLayout title="Dashboard" user={session.user}>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-      {[
-        { label: 'Informes publicados', value: reportCounts?.published ?? 0, color: 'green' },
-        { label: 'Informes en borrador', value: reportCounts?.draft ?? 0, color: 'yellow' },
-        { label: 'Noticias publicadas', value: newsCounts?.published ?? 0, color: 'green' },
-        { label: 'Noticias en borrador', value: newsCounts?.draft ?? 0, color: 'yellow' },
-      ].map(({ label, value, color }) => (
-        <div class="bg-white rounded-card border border-gray-100 p-5">
-          <p class="text-3xl font-bold mb-1">{value}</p>
-          <p class="text-sm text-gray-500">{label}</p>
-        </div>
-      ))}
+  <!-- ── Header ────────────────────────────────────────────────────────────── -->
+  <div class="dash-header">
+    <div>
+      <h1 class="adm-page-title">Panel editorial</h1>
+      <p class="dash-sub">Bienvenido, <strong>{session.user.name}</strong>. Aquí tienes el estado de la plataforma.</p>
     </div>
-
-    <!-- Quick actions -->
-    <h2 class="text-xl font-semibold mb-4">Acciones rápidas</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <a
-        href="/admin/reports/new"
-        class="flex items-center gap-3 bg-white border border-gray-100 rounded-card p-5 hover:border-madrid-red transition-colors no-underline group"
-      >
-        <span class="text-2xl">📝</span>
-        <div>
-          <p class="font-medium text-madrid-dark group-hover:text-madrid-red">Nuevo informe</p>
-          <p class="text-sm text-gray-400">Crear un análisis en profundidad</p>
-        </div>
-      </a>
-      <a
-        href="/admin/news/new"
-        class="flex items-center gap-3 bg-white border border-gray-100 rounded-card p-5 hover:border-madrid-red transition-colors no-underline group"
-      >
-        <span class="text-2xl">📰</span>
-        <div>
-          <p class="font-medium text-madrid-dark group-hover:text-madrid-red">Nueva noticia</p>
-          <p class="text-sm text-gray-400">Publicar una actualización de actualidad</p>
-        </div>
-      </a>
+    <div class="dash-actions">
+      <a href="/admin/reports/new" class="adm-btn">+ Nuevo reporte</a>
     </div>
   </div>
-</BaseLayout>
+
+  <!-- ── Stats row ──────────────────────────────────────────────────────────── -->
+  <div class="dash-stats">
+    <div class="adm-stat">
+      <div class="adm-stat__value adm-stat__value--green">{data.reports.published}</div>
+      <div class="adm-stat__label">Reportes publicados</div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat__value adm-stat__value--accent">{data.reports.thisWeek}</div>
+      <div class="adm-stat__label">Publicados esta semana</div>
+      {data.reports.today > 0 && <div class="adm-stat__sub">{data.reports.today} hoy</div>}
+    </div>
+    <div class="adm-stat">
+      <div class={`adm-stat__value ${data.reports.draft > 0 ? 'adm-stat__value--amber' : ''}`}>{data.reports.draft}</div>
+      <div class="adm-stat__label">Borradores pendientes</div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat__value">{data.news.published}</div>
+      <div class="adm-stat__label">Noticias publicadas</div>
+      {data.news.draft > 0 && <div class="adm-stat__sub">{data.news.draft} en borrador</div>}
+    </div>
+  </div>
+
+  <!-- ── Two-column middle ──────────────────────────────────────────────────── -->
+  <div class="dash-mid">
+
+    <!-- Recent activity -->
+    <div class="adm-panel">
+      <div class="adm-panel__head">
+        <span>Actividad reciente</span>
+        <a href="/admin/reports">Ver todos →</a>
+      </div>
+      {data.recentActivity.length > 0 ? (
+        data.recentActivity.map(r => (
+          <a href={`/admin/reports/${r.id}/edit`} class="adm-activity-row">
+            <span class="adm-activity-dot" aria-hidden="true"></span>
+            <span class="adm-activity-title">{r.title}</span>
+            <span class="adm-activity-meta">
+              {CATEGORY_DISPLAY[r.category]?.name ?? r.category}
+              {r.districtName && ` · ${r.districtName}`}
+              {r.publishedAt && ` · ${fmtRelative(r.publishedAt)}`}
+            </span>
+          </a>
+        ))
+      ) : (
+        <div class="adm-panel-empty">Sin reportes publicados todavía.</div>
+      )}
+    </div>
+
+    <!-- Editorial signals -->
+    <div class="adm-panel">
+      <div class="adm-panel__head"><span>Señales editoriales</span></div>
+
+      {data.coldDistricts.length > 0 ? (
+        <div class="signal-group">
+          <div class="signal-group__head">Distritos sin actividad reciente</div>
+          {data.coldDistricts.map(d => (
+            <div class="adm-signal-row">
+              <span class="adm-signal-icon signal-warn" aria-hidden="true">◦</span>
+              <div class="adm-signal-body">
+                <div class="adm-signal-label">
+                  <a href={`/districts/${d.slug}`}>{d.name}</a>
+                </div>
+                <div class="adm-signal-meta">
+                  {d.lastAt ? `Último reporte ${fmtRelative(d.lastAt)}` : 'Sin reportes publicados'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div class="adm-signal-row">
+          <span class="adm-signal-icon signal-ok" aria-hidden="true">✓</span>
+          <div class="adm-signal-body">
+            <div class="adm-signal-label">Todos los distritos tienen actividad reciente</div>
+          </div>
+        </div>
+      )}
+
+      {data.staleDrafts.length > 0 && (
+        <div class="signal-group">
+          <div class="signal-group__head">Borradores sin actualizar</div>
+          {data.staleDrafts.map(r => (
+            <div class="adm-signal-row">
+              <span class="adm-signal-icon signal-warn" aria-hidden="true">◦</span>
+              <div class="adm-signal-body">
+                <div class="adm-signal-label">
+                  <a href={`/admin/reports/${r.id}/edit`}>{r.title}</a>
+                </div>
+                <div class="adm-signal-meta">Sin cambios desde {fmtDate.format(r.updatedAt)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.coldDistricts.length === 0 && data.staleDrafts.length === 0 && (
+        <div class="adm-signal-row">
+          <span class="adm-signal-icon signal-ok" aria-hidden="true">✓</span>
+          <div class="adm-signal-body">
+            <div class="adm-signal-label">Todo en orden. No hay alertas editoriales.</div>
+          </div>
+        </div>
+      )}
+    </div>
+
+  </div>
+
+  <!-- ── Category breakdown ─────────────────────────────────────────────────── -->
+  {data.categoryWeek.length > 0 && (
+    <div class="adm-panel" style="margin-top: 1.25rem">
+      <div class="adm-panel__head">
+        <span>Categorías esta semana</span>
+        <a href="/admin/reports?status=published">Ver reportes →</a>
+      </div>
+      {data.categoryWeek.map(c => {
+        const meta = CATEGORY_DISPLAY[c.category];
+        const pct  = Math.round((c.count / maxCatCount) * 100);
+        return (
+          <div class="adm-catbar-row">
+            <span class="adm-catbar-name">{meta?.name ?? c.category}</span>
+            <div class="adm-catbar-track">
+              <div class="adm-catbar-fill" style={`width:${pct}%; background:${meta?.color ?? 'var(--adm-accent)'}`}></div>
+            </div>
+            <span class="adm-catbar-count">{c.count}</span>
+          </div>
+        );
+      })}
+    </div>
+  )}
+
+  {data.categoryWeek.length === 0 && (
+    <div style="margin-top: 1.25rem">
+      <div class="adm-panel">
+        <div class="adm-panel__head"><span>Categorías esta semana</span></div>
+        <div class="adm-panel-empty">Sin publicaciones esta semana.</div>
+      </div>
+    </div>
+  )}
+
+</AdminLayout>
+
+<style>
+  .dash-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap;
+  }
+  .dash-sub { font-size: 13px; color: var(--adm-txt2); margin-top: 4px; }
+  .dash-sub strong { color: var(--adm-txt); font-weight: 600; }
+  .dash-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+  .dash-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; background: var(--adm-border);
+    border: 1px solid var(--adm-border); border-radius: var(--adm-radius);
+    overflow: hidden; margin-bottom: 1.25rem;
+    box-shadow: var(--adm-shadow);
+  }
+  .dash-stats .adm-stat {
+    border: none; border-radius: 0; box-shadow: none;
+    background: var(--adm-bg2);
+  }
+
+  .dash-mid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
+  }
+
+  .signal-group { border-top: 1px solid var(--adm-border); }
+  .signal-group:first-child { border-top: none; }
+  .signal-group__head {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--adm-txt3); padding: 0.5rem 1.25rem 0.25rem;
+  }
+
+  .signal-warn { color: var(--adm-amber); }
+  .signal-ok   { color: var(--adm-green); }
+
+  .adm-panel-empty { padding: 1.5rem 1.25rem; font-size: 12px; color: var(--adm-txt3); }
+
+  @media (max-width: 900px) {
+    .dash-stats { grid-template-columns: repeat(2, 1fr); }
+    .dash-mid   { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .dash-stats { grid-template-columns: 1fr 1fr; }
+  }
+</style>

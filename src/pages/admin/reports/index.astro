@@ -1,114 +1,104 @@
 ---
-import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { auth } from '../../../lib/auth';
-import { db } from '../../../db';
-import { reports, user, districts } from '../../../db/schema';
-import { CATEGORY_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../../lib/content-labels';
-import { eq, desc } from 'drizzle-orm';
+import { getAdminReportsList } from '../../../lib/data/admin-queries';
+import { CATEGORY_DISPLAY } from '../../../lib/content-labels';
+import { fmtRelative } from '../../../lib/format';
 
 const session = await auth.api.getSession({ headers: Astro.request.headers });
 if (!session || session.user.role === 'viewer') return Astro.redirect('/admin/login');
 
-const allReports = await db
-  .select({
-    id: reports.id,
-    title: reports.title,
-    slug: reports.slug,
-    status: reports.status,
-    category: reports.category,
-    publishedAt: reports.publishedAt,
-    updatedAt: reports.updatedAt,
-    authorName: user.name,
-    districtName: districts.name,
-  })
-  .from(reports)
-  .innerJoin(user, eq(reports.authorId, user.id))
-  .leftJoin(districts, eq(reports.districtId, districts.id))
-  .orderBy(desc(reports.updatedAt));
+const statusFilter = Astro.url.searchParams.get('status') || 'all';
+const { rows: allReports, counts } = await getAdminReportsList(
+  statusFilter !== 'all' ? statusFilter : undefined,
+);
 
 const fmt = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'short' });
+const tabUrl = (s: string) => s === 'all' ? '/admin/reports' : `/admin/reports?status=${s}`;
 ---
 
-<BaseLayout title="Informes — Admin">
-  <div class="max-w-6xl mx-auto">
+<AdminLayout title="Reportes" user={session.user}>
 
-    <!-- Header -->
-    <div class="flex items-center justify-between mb-8">
-      <div>
-        <a href="/admin" class="text-sm text-gray-400 hover:text-madrid-red no-underline">Admin</a>
-        <span class="text-gray-300 mx-2">/</span>
-        <span class="text-sm text-gray-600 font-medium">Informes</span>
-      </div>
-      <a
-        href="/admin/reports/new"
-        class="px-4 py-2 bg-madrid-red text-white text-sm font-medium rounded-md hover:bg-red-700 transition-colors no-underline"
-      >
-        + Nuevo informe
+  <div class="adm-page-header">
+    <nav class="adm-breadcrumb">
+      <a href="/admin">Admin</a>
+      <span aria-hidden="true">/</span>
+      <span>Reportes</span>
+    </nav>
+    <div class="rp-head">
+      <h1 class="adm-page-title">Reportes</h1>
+      <a href="/admin/reports/new" class="adm-btn">+ Nuevo reporte</a>
+    </div>
+  </div>
+
+  <div class="adm-panel">
+    <!-- Filter tabs -->
+    <div class="adm-tabs">
+      <a href={tabUrl('all')}       class:list={['adm-tab', { active: statusFilter === 'all' }]}>
+        Todos <span class="adm-tab__count">{counts.all}</span>
+      </a>
+      <a href={tabUrl('published')} class:list={['adm-tab', { active: statusFilter === 'published' }]}>
+        Publicados <span class="adm-tab__count">{counts.published}</span>
+      </a>
+      <a href={tabUrl('draft')}     class:list={['adm-tab', { active: statusFilter === 'draft' }]}>
+        Borradores <span class="adm-tab__count">{counts.draft}</span>
+      </a>
+      <a href={tabUrl('archived')}  class:list={['adm-tab', { active: statusFilter === 'archived' }]}>
+        Archivados <span class="adm-tab__count">{counts.archived}</span>
       </a>
     </div>
 
     {allReports.length === 0 ? (
-      <div class="text-center py-24 border-2 border-dashed border-gray-200 rounded-xl">
-        <p class="text-gray-400 mb-4">No hay informes todavía</p>
-        <a href="/admin/reports/new" class="text-madrid-red text-sm hover:underline">
-          Crear el primero →
-        </a>
+      <div class="adm-panel-empty" style="padding: 3rem 1.25rem; text-align: center;">
+        <p style="color: var(--adm-txt3); margin-bottom: 1rem;">
+          {statusFilter === 'all' ? 'No hay reportes todavía.' : `No hay reportes ${statusFilter === 'published' ? 'publicados' : statusFilter === 'draft' ? 'en borrador' : 'archivados'}.`}
+        </p>
+        {statusFilter === 'all' && <a href="/admin/reports/new" class="adm-btn adm-btn--sm">Crear el primero →</a>}
       </div>
     ) : (
-      <div class="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
-        <table class="w-full text-sm">
-          <thead class="border-b border-gray-100 bg-gray-50">
+      <div class="rp-table-wrap">
+        <table class="adm-table">
+          <thead>
             <tr>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Título</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Categoría</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
-              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Actualizado</th>
-              <th class="px-4 py-3"></th>
+              <th>Título</th>
+              <th class="col-cat">Categoría</th>
+              <th>Estado</th>
+              <th class="col-date">Actualizado</th>
+              <th class="col-actions"></th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-50">
-            {allReports.map((report) => (
-              <tr class="hover:bg-gray-50/50 transition-colors group" data-id={report.id} data-status={report.status}>
-                <td class="px-4 py-3">
-                  <div class="font-medium text-gray-900 group-hover:text-madrid-red transition-colors">
-                    {report.title}
+          <tbody>
+            {allReports.map(report => (
+              <tr data-id={report.id} data-status={report.status}>
+                <td>
+                  <div class="rp-title">{report.title}</div>
+                  <div class="rp-meta">
+                    {report.districtName && <span>{report.districtName}</span>}
+                    {report.authorName && <span>{report.authorName}</span>}
+                    {report.publishedAt && report.status === 'published' && (
+                      <span>Publicado {fmtRelative(report.publishedAt)}</span>
+                    )}
                   </div>
-                  {report.districtName && (
-                    <div class="text-xs text-gray-400 mt-0.5">{report.districtName}</div>
-                  )}
                 </td>
-                <td class="px-4 py-3 hidden md:table-cell">
-                  <span class="text-gray-500">{CATEGORY_LABELS[report.category] ?? report.category}</span>
-                </td>
-                <td class="px-4 py-3">
-                  <span class={`inline-block text-xs font-medium px-2 py-0.5 rounded status-badge ${STATUS_COLORS[report.status]}`}>
-                    {STATUS_LABELS[report.status]}
+                <td class="col-cat">
+                  <span class="rp-cat" style={`--cat: ${CATEGORY_DISPLAY[report.category]?.color ?? 'var(--adm-txt3)'}`}>
+                    {CATEGORY_DISPLAY[report.category]?.name ?? report.category}
                   </span>
                 </td>
-                <td class="px-4 py-3 text-gray-400 hidden lg:table-cell">
-                  {fmt.format(report.updatedAt)}
+                <td>
+                  <span class={`adm-badge adm-badge--${report.status}`}>
+                    <span class="adm-badge__dot"></span>
+                    {report.status === 'published' ? 'Publicado' : report.status === 'draft' ? 'Borrador' : 'Archivado'}
+                  </span>
                 </td>
-                <td class="px-4 py-3">
-                  <div class="flex items-center gap-2 justify-end">
-                    <a
-                      href={`/admin/reports/${report.id}/edit`}
-                      class="text-xs text-gray-500 hover:text-madrid-red transition-colors no-underline px-2 py-1 rounded hover:bg-gray-100"
-                    >
-                      Editar
-                    </a>
-                    <button
-                      class="publish-btn text-xs px-2 py-1 rounded border transition-colors"
-                      class:list={[
-                        report.status === 'published'
-                          ? 'border-gray-200 text-gray-500 hover:border-yellow-400 hover:text-yellow-700'
-                          : 'border-madrid-red text-madrid-red hover:bg-madrid-red hover:text-white'
-                      ]}
-                    >
+                <td class="col-date rp-date">{fmt.format(report.updatedAt)}</td>
+                <td class="col-actions">
+                  <div class="rp-actions">
+                    <a href={`/admin/reports/${report.id}/edit`} class="adm-action">Editar</a>
+                    <button class="adm-action adm-action--publish publish-btn">
                       {report.status === 'published' ? 'Despublicar' : 'Publicar'}
                     </button>
-                    <button class="delete-btn text-xs px-2 py-1 rounded border border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-600 transition-colors">
-                      Borrar
-                    </button>
+                    <button class="adm-action adm-action--danger delete-btn">Borrar</button>
                   </div>
                 </td>
               </tr>
@@ -118,15 +108,34 @@ const fmt = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 's
       </div>
     )}
   </div>
-</BaseLayout>
+
+</AdminLayout>
+
+<style>
+  .rp-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+  }
+  .rp-table-wrap { overflow-x: auto; }
+  .col-cat     { width: 130px; }
+  .col-date    { width: 140px; }
+  .col-actions { width: 210px; }
+
+  .rp-title { font-size: 13px; font-weight: 600; color: var(--adm-txt); line-height: 1.4; }
+  .rp-meta  { display: flex; gap: 8px; margin-top: 2px; font-size: 11px; color: var(--adm-txt3); flex-wrap: wrap; }
+  .rp-cat   { font-size: 11px; color: var(--cat, var(--adm-txt3)); font-weight: 500; }
+  .rp-date  { font-size: 11px; color: var(--adm-txt3); white-space: nowrap; }
+  .rp-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+
+  .adm-panel-empty { font-size: 12px; color: var(--adm-txt3); }
+</style>
 
 <script>
-  // Publish / unpublish toggle
-  document.querySelectorAll('.publish-btn').forEach((btn) => {
+  document.querySelectorAll<HTMLButtonElement>('.publish-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const row = btn.closest('tr');
-      const id = row.dataset.id;
-      const currentStatus = row.dataset.status;
+      const row = btn.closest('tr') as HTMLTableRowElement;
+      const id = row.dataset.id!;
+      const currentStatus = row.dataset.status!;
       const nextStatus = currentStatus === 'published' ? 'draft' : 'published';
 
       btn.textContent = '…';
@@ -139,48 +148,39 @@ const fmt = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 's
       });
 
       if (res.ok) {
-        // Update row state without a full reload
         row.dataset.status = nextStatus;
-        const badge = row.querySelector('.status-badge');
-        if (nextStatus === 'published') {
-          badge.textContent = 'Publicado';
-          badge.className = 'inline-block text-xs font-medium px-2 py-0.5 rounded status-badge bg-green-100 text-green-800';
-          btn.textContent = 'Despublicar';
-          btn.className = 'publish-btn text-xs px-2 py-1 rounded border transition-colors border-gray-200 text-gray-500 hover:border-yellow-400 hover:text-yellow-700';
-        } else {
-          badge.textContent = 'Borrador';
-          badge.className = 'inline-block text-xs font-medium px-2 py-0.5 rounded status-badge bg-yellow-100 text-yellow-800';
-          btn.textContent = 'Publicar';
-          btn.className = 'publish-btn text-xs px-2 py-1 rounded border transition-colors border-madrid-red text-madrid-red hover:bg-madrid-red hover:text-white';
+        const badge = row.querySelector('.adm-badge') as HTMLElement;
+        if (badge) {
+          badge.className = `adm-badge adm-badge--${nextStatus}`;
+          const label = nextStatus === 'published' ? 'Publicado' : nextStatus === 'draft' ? 'Borrador' : 'Archivado';
+          badge.innerHTML = `<span class="adm-badge__dot"></span>${label}`;
         }
+        btn.textContent = nextStatus === 'published' ? 'Despublicar' : 'Publicar';
       } else {
-        alert('No se pudo cambiar el estado. Inténtalo de nuevo.');
+        alert('No se pudo cambiar el estado.');
         btn.textContent = currentStatus === 'published' ? 'Despublicar' : 'Publicar';
       }
       btn.disabled = false;
     });
   });
 
-  // Delete
-  document.querySelectorAll('.delete-btn').forEach((btn) => {
+  document.querySelectorAll<HTMLButtonElement>('.delete-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const row = btn.closest('tr');
-      const id = row.dataset.id;
-      const title = row.querySelector('td .font-medium')?.textContent?.trim();
+      const row = btn.closest('tr') as HTMLTableRowElement;
+      const id = row.dataset.id!;
+      const title = row.querySelector<HTMLElement>('.rp-title')?.textContent?.trim();
 
       if (!confirm(`¿Borrar "${title}"? Esta acción no se puede deshacer.`)) return;
-
       btn.textContent = '…';
       btn.disabled = true;
 
       const res = await fetch(`/api/admin/reports/${id}`, { method: 'DELETE' });
-
       if (res.ok) {
-        row.style.transition = 'opacity 0.3s';
+        row.style.transition = 'opacity 0.25s';
         row.style.opacity = '0';
-        setTimeout(() => row.remove(), 300);
+        setTimeout(() => row.remove(), 250);
       } else {
-        alert('No se pudo borrar. Inténtalo de nuevo.');
+        alert('No se pudo borrar.');
         btn.textContent = 'Borrar';
         btn.disabled = false;
       }
