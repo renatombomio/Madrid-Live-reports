@@ -1,5 +1,5 @@
 import { db } from '../../db';
-import { reports, news, districts, user } from '../../db/schema';
+import { reports, districts, user } from '../../db/schema';
 import { eq, and, asc, desc, sql } from 'drizzle-orm';
 
 // ── Overview dashboard ────────────────────────────────────────────────────────
@@ -7,7 +7,6 @@ import { eq, and, asc, desc, sql } from 'drizzle-orm';
 export async function getAdminOverview() {
   const [
     [statusRow],
-    [newsRow],
     coldDistricts,
     staleDrafts,
     recentActivity,
@@ -22,12 +21,6 @@ export async function getAdminOverview() {
       thisWeek: sql<number>`count(case when status = 'published' and published_at > now() - interval '7 days' then 1 end)`.mapWith(Number),
       today:    sql<number>`count(case when status = 'published' and published_at > now() - interval '24 hours' then 1 end)`.mapWith(Number),
     }).from(reports),
-
-    // News counts
-    db.select({
-      published: sql<number>`count(case when status = 'published' then 1 end)`.mapWith(Number),
-      draft:     sql<number>`count(case when status = 'draft' then 1 end)`.mapWith(Number),
-    }).from(news),
 
     // Cold districts: no published report in last 30 days (or ever)
     db.select({
@@ -90,7 +83,6 @@ export async function getAdminOverview() {
 
   return {
     reports:       statusRow  ?? { total: 0, published: 0, draft: 0, archived: 0, thisWeek: 0, today: 0 },
-    news:          newsRow    ?? { published: 0, draft: 0 },
     coldDistricts,
     staleDrafts,
     recentActivity,

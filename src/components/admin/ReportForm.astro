@@ -18,50 +18,50 @@ const { mode, report, districts: districtList, tags: tagList } = Astro.props;
 const isEdit = mode === 'edit';
 const submitUrl = isEdit ? `/api/admin/reports/${report!.id}` : '/api/admin/reports';
 const submitMethod = isEdit ? 'PATCH' : 'POST';
+
+const updatedAt = isEdit && report?.updatedAt
+  ? new Date(report.updatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+  : null;
 ---
 
-<form id="report-form" class="flex flex-col gap-0" novalidate>
-  <!-- ── Top bar ───────────────────────────────────────────── -->
-  <div class="flex items-center justify-between gap-4 mb-8">
-    <a href="/admin/reports" class="text-sm text-gray-500 hover:text-madrid-red no-underline">
-      ← Volver a informes
-    </a>
-    <div class="flex items-center gap-3">
-      <span id="autosave-status" class="text-xs text-gray-400" aria-live="polite"></span>
-      <kbd class="form-kbd-hint" title="Guardar borrador">⌘S</kbd>
-      <button
-        type="button"
-        id="btn-draft"
-        class="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-      >
-        Guardar borrador
+<form id="report-form" class="rf-form" novalidate>
+
+  <!-- ── Sticky actions bar ─────────────────────────────────────────── -->
+  <div class="rf-topbar">
+    <a href="/admin/reports" class="rf-back">← Reportes</a>
+    <span id="autosave-status" class="rf-autosave" aria-live="polite"></span>
+    <div class="rf-topbar__actions">
+      <kbd class="rf-kbd" title="Guardar borrador">⌘S</kbd>
+      <button type="button" id="btn-draft" class="adm-btn adm-btn--ghost adm-btn--sm">
+        Borrador
       </button>
-      <button
-        type="button"
-        id="btn-publish"
-        class="px-4 py-2 text-sm bg-madrid-red text-white rounded-md hover:bg-red-700 transition-colors"
-      >
+      <button type="button" id="btn-publish" class="adm-btn adm-btn--sm">
         {isEdit && report?.status === 'published' ? 'Actualizar' : 'Publicar'}
       </button>
     </div>
   </div>
 
-  <!-- Restore-draft banner (new reports only, shown by JS if local draft exists) -->
+  <!-- ── Restore-draft banner (new reports only) ───────────────────── -->
   {!isEdit && (
-    <div id="restore-banner" class="hidden mb-6 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 flex items-center justify-between gap-3">
-      <span>Hay un borrador guardado localmente. <button id="restore-btn" class="underline font-medium hover:no-underline">Restaurar</button></span>
-      <button id="restore-dismiss" class="text-amber-600 hover:text-amber-900 text-xs border border-amber-300 rounded px-2 py-0.5 transition-colors">Descartar</button>
+    <div id="restore-banner" class="rf-restore" hidden>
+      <span>
+        Hay un borrador guardado localmente.{' '}
+        <button id="restore-btn" class="rf-restore__link">Restaurar</button>
+      </span>
+      <button id="restore-dismiss" class="rf-restore__dismiss">Descartar</button>
     </div>
   )}
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- ── Main column ──────────────────────────────────────── -->
-    <div class="lg:col-span-2 flex flex-col gap-6">
+  <!-- ── Two-column workspace ──────────────────────────────────────── -->
+  <div class="rf-layout">
+
+    <!-- ── Main editor column ──────────────────────────────────────── -->
+    <div class="rf-main">
 
       <!-- Title -->
-      <div>
-        <label for="title" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Título <span class="text-madrid-red">*</span>
+      <div class="rf-field">
+        <label for="title" class="rf-label">
+          Título <span class="rf-required">*</span>
         </label>
         <input
           id="title"
@@ -70,33 +70,31 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
           required
           value={report?.title ?? ''}
           placeholder="El título del informe"
-          class="w-full px-3 py-2.5 border border-gray-200 rounded-md text-lg font-medium focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
+          class="rf-input rf-input--title"
         />
       </div>
 
       <!-- Slug -->
-      <div>
-        <label for="slug" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Slug (URL)
-        </label>
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-400 whitespace-nowrap">/reports/</span>
+      <div class="rf-field">
+        <label for="slug" class="rf-label">Slug (URL)</label>
+        <div class="rf-slug-row">
+          <span class="rf-slug-prefix">/reports/</span>
           <input
             id="slug"
             name="slug"
             type="text"
             value={report?.slug ?? ''}
             placeholder="se-genera-del-titulo"
-            class="flex-1 px-3 py-2 border border-gray-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
+            class="rf-input rf-input--mono rf-slug-input"
           />
         </div>
-        <p class="text-xs text-gray-400 mt-1">Se auto-genera del título. Edítalo para personalizarlo.</p>
+        <p class="rf-hint">Se auto-genera del título. Edítalo para personalizarlo.</p>
       </div>
 
       <!-- Summary -->
-      <div>
-        <label for="summary" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Resumen <span class="text-madrid-red">*</span>
+      <div class="rf-field">
+        <label for="summary" class="rf-label">
+          Resumen <span class="rf-required">*</span>
         </label>
         <textarea
           id="summary"
@@ -104,156 +102,151 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
           required
           rows="3"
           placeholder="Descripción breve que aparece en las tarjetas y el SEO"
-          class="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red resize-none"
+          class="rf-textarea"
         >{report?.summary ?? ''}</textarea>
       </div>
 
       <!-- Content editor -->
-      <div>
-        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Contenido <span class="text-madrid-red">*</span>
-        </label>
-
-        <!-- Tabs -->
-        <div class="flex border-b border-gray-200 mb-0">
-          <button type="button" id="tab-write"
-            class="px-4 py-2 text-sm font-medium border-b-2 border-madrid-red text-madrid-red -mb-px">
-            Editar
-          </button>
-          <button type="button" id="tab-preview"
-            class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px">
-            Vista previa
-          </button>
+      <div class="rf-field">
+        <div class="rf-editor-head">
+          <span class="rf-label">Contenido <span class="rf-required">*</span></span>
+          <div class="rf-tabs" role="tablist">
+            <button type="button" id="tab-write" role="tab" aria-selected="true"
+              class="rf-tab rf-tab--active">Editar</button>
+            <button type="button" id="tab-preview" role="tab" aria-selected="false"
+              class="rf-tab">Vista previa</button>
+          </div>
         </div>
 
         <!-- Toolbar -->
-        <div id="editor-toolbar" class="flex flex-wrap gap-1 border border-b-0 border-gray-200 bg-gray-50 px-2 py-1.5 rounded-t-none">
+        <div id="editor-toolbar" class="rf-toolbar" aria-label="Herramientas de formato">
           {[
-            { label: 'B', title: 'Negrita', tag: '<strong>', close: '</strong>' },
-            { label: 'I', title: 'Cursiva', tag: '<em>', close: '</em>' },
-            { label: 'H2', title: 'Título H2', tag: '<h2>', close: '</h2>' },
-            { label: 'H3', title: 'Subtítulo H3', tag: '<h3>', close: '</h3>' },
-            { label: '¶', title: 'Párrafo', tag: '<p>', close: '</p>' },
-            { label: '🔗', title: 'Enlace', tag: '<a href="">', close: '</a>' },
-            { label: '<>', title: 'Código inline', tag: '<code>', close: '</code>' },
-            { label: '```', title: 'Bloque de código', tag: '<pre><code>', close: '</code></pre>' },
-            { label: '❝', title: 'Cita', tag: '<blockquote>', close: '</blockquote>' },
-            { label: '─', title: 'Separador', tag: '<hr />', close: '' },
+            { label: 'B',   title: 'Negrita',         tag: '<strong>',     close: '</strong>'     },
+            { label: 'I',   title: 'Cursiva',          tag: '<em>',         close: '</em>'         },
+            { label: 'H2',  title: 'Título H2',        tag: '<h2>',         close: '</h2>'         },
+            { label: 'H3',  title: 'Subtítulo H3',     tag: '<h3>',         close: '</h3>'         },
+            { label: '¶',   title: 'Párrafo',          tag: '<p>',          close: '</p>'          },
+            { label: '🔗',  title: 'Enlace',           tag: '<a href="">',  close: '</a>'          },
+            { label: '<>',  title: 'Código inline',    tag: '<code>',       close: '</code>'       },
+            { label: '```', title: 'Bloque de código', tag: '<pre><code>',  close: '</code></pre>' },
+            { label: '❝',   title: 'Cita',             tag: '<blockquote>', close: '</blockquote>' },
+            { label: '─',   title: 'Separador',        tag: '<hr />',       close: ''              },
           ].map(({ label, title, tag, close }) => (
             <button
               type="button"
               title={title}
               data-tag={tag}
               data-close={close}
-              class="toolbar-btn px-2 py-0.5 text-xs font-mono border border-gray-300 rounded bg-white hover:bg-madrid-red hover:text-white hover:border-madrid-red transition-colors"
-            >
-              {label}
-            </button>
+              class="rf-toolbar-btn"
+            >{label}</button>
           ))}
         </div>
 
-        <!-- Write area -->
+        <!-- Write panel -->
         <div id="write-panel">
           <textarea
             id="content"
             name="content"
             required
-            rows="20"
+            rows="22"
             placeholder="<p>Escribe el contenido del informe en HTML...</p>"
-            class="w-full px-3 py-3 border border-gray-200 rounded-b-md text-sm font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red resize-y"
+            class="rf-textarea rf-textarea--code"
           >{report?.content ?? ''}</textarea>
         </div>
 
-        <!-- Preview area (hidden by default) -->
-        <div
-          id="preview-panel"
-          class="hidden border border-gray-200 rounded-b-md p-4 min-h-[300px] prose prose-sm max-w-none bg-white"
-        ></div>
+        <!-- Preview panel -->
+        <div id="preview-panel" class="rf-preview" hidden></div>
       </div>
 
     </div>
 
-    <!-- ── Sidebar ────────────────────────────────────────────── -->
-    <aside class="flex flex-col gap-6">
+    <!-- ── Metadata sidebar ──────────────────────────────────────────── -->
+    <aside class="rf-sidebar">
 
-      <!-- Status indicator -->
-      <div class="bg-gray-50 border border-gray-200 rounded-md p-4">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Estado</p>
-        <div id="status-badge" class={`inline-block text-xs font-medium px-2 py-1 rounded ${
-          report?.status === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-        }`}>
-          {report?.status === 'published' ? 'Publicado' : 'Borrador'}
+      <!-- Status panel -->
+      <div class="adm-panel">
+        <div class="adm-panel__head">Estado</div>
+        <div class="rf-panel-body">
+          <div
+            id="status-badge"
+            class={`adm-badge ${report?.status === 'published' ? 'adm-badge--published' : 'adm-badge--draft'}`}
+          >
+            <span class="adm-badge__dot"></span>
+            {report?.status === 'published' ? 'Publicado' : 'Borrador'}
+          </div>
+          <input type="hidden" id="status-input" name="status" value={report?.status ?? 'draft'} />
+          {updatedAt && <p class="rf-meta-note">Actualizado {updatedAt}</p>}
         </div>
-        <input type="hidden" id="status-input" name="status" value={report?.status ?? 'draft'} />
       </div>
 
-      <!-- Category -->
-      <div>
-        <label for="category" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Categoría <span class="text-madrid-red">*</span>
-        </label>
-        <select
-          id="category"
-          name="category"
-          class="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
-        >
-          {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-            <option value={value} selected={report?.category === value}>{label}</option>
-          ))}
-        </select>
-      </div>
+      <!-- Metadata panel -->
+      <div class="adm-panel">
+        <div class="adm-panel__head">Metadatos</div>
+        <div class="rf-panel-body rf-panel-body--stack">
 
-      <!-- District -->
-      <div>
-        <label for="districtId" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Distrito
-        </label>
-        <select
-          id="districtId"
-          name="districtId"
-          class="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
-        >
-          <option value="">— Toda la ciudad —</option>
-          {districtList.map((d) => (
-            <option value={d.id} selected={report?.districtId === d.id}>{d.name}</option>
-          ))}
-        </select>
-      </div>
-
-      <!-- Tags -->
-      <div>
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Etiquetas</p>
-        <div class="grid grid-cols-2 gap-1.5">
-          {tagList.map((tag) => (
-            <label class="flex items-center gap-1.5 text-sm cursor-pointer group">
-              <input
-                type="checkbox"
-                name="tags"
-                value={tag.id}
-                checked={report?.tagIds?.includes(tag.id)}
-                class="accent-madrid-red"
-              />
-              <span class="text-gray-700 group-hover:text-madrid-red transition-colors">{tag.name}</span>
+          <!-- Category -->
+          <div class="rf-field">
+            <label for="category" class="rf-label">
+              Categoría <span class="rf-required">*</span>
             </label>
-          ))}
+            <select id="category" name="category" class="rf-select">
+              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                <option value={value} selected={report?.category === value}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <!-- District -->
+          <div class="rf-field">
+            <label for="districtId" class="rf-label">Distrito</label>
+            <select id="districtId" name="districtId" class="rf-select">
+              <option value="">— Toda la ciudad —</option>
+              {districtList.map((d) => (
+                <option value={d.id} selected={report?.districtId === d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <!-- Tags -->
+          <div class="rf-field">
+            <p class="rf-label">Etiquetas</p>
+            <div class="rf-tags-grid">
+              {tagList.map((tag) => (
+                <label class="rf-tag-label">
+                  <input
+                    type="checkbox"
+                    name="tags"
+                    value={tag.id}
+                    checked={report?.tagIds?.includes(tag.id)}
+                    class="rf-tag-check"
+                  />
+                  <span class="rf-tag-name">{tag.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
 
-      <!-- Cover image -->
-      <div>
-        <label for="coverImage" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Imagen de portada (URL)
-        </label>
-        <input
-          id="coverImage"
-          name="coverImage"
-          type="url"
-          value={report?.coverImage ?? ''}
-          placeholder="https://..."
-          class="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-madrid-red/30 focus:border-madrid-red"
-        />
-        <div id="cover-preview" class="mt-2 hidden">
-          <img id="cover-img" src="" alt="Preview" class="w-full h-32 object-cover rounded-md" />
+      <!-- Cover image panel -->
+      <div class="adm-panel">
+        <div class="adm-panel__head">Imagen de portada</div>
+        <div class="rf-panel-body">
+          <div class="rf-field">
+            <label for="coverImage" class="rf-label">URL</label>
+            <input
+              id="coverImage"
+              name="coverImage"
+              type="url"
+              value={report?.coverImage ?? ''}
+              placeholder="https://…"
+              class="rf-input"
+            />
+          </div>
+          <div id="cover-preview" class="rf-cover-preview" hidden>
+            <img id="cover-img" src="" alt="Vista previa" class="rf-cover-img" />
+          </div>
         </div>
       </div>
 
@@ -261,22 +254,411 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
   </div>
 
   <!-- Error banner -->
-  <div id="error-banner" class="hidden mt-6 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700"></div>
+  <div id="error-banner" class="rf-error" hidden></div>
+
 </form>
 
 <style>
-  .form-kbd-hint {
-    font-size: 10px; color: #9ca3af; background: #f9fafb;
-    border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 6px;
-    font-family: inherit; display: inline-block;
+  /* ── Form shell ──────────────────────────────────────────────────────────── */
+  .rf-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
   }
+
+  /* ── Sticky action bar ───────────────────────────────────────────────────── */
+  .rf-topbar {
+    position: sticky;
+    top: 52px; /* sits flush below .adm-bar */
+    z-index: 90;
+    background: var(--adm-bg);
+    border-bottom: 1px solid var(--adm-border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    margin-bottom: 1.75rem;
+    /* extend to cover adm-main padding so bg is flush */
+    margin-left: -1.5rem;
+    margin-right: -1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .rf-back {
+    font-size: 12px;
+    color: var(--adm-txt3);
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: color 0.15s;
+  }
+  .rf-back:hover { color: var(--adm-accent); }
+
+  .rf-autosave {
+    flex: 1;
+    font-size: 11px;
+    color: var(--adm-txt3);
+    min-width: 0;
+  }
+
+  .rf-topbar__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .rf-kbd {
+    font-size: 10px;
+    color: var(--adm-txt3);
+    background: var(--adm-bg3);
+    border: 1px solid var(--adm-border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: inherit;
+    cursor: default;
+  }
+
+  /* ── Restore banner ──────────────────────────────────────────────────────── */
+  .rf-restore {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--adm-amberbg);
+    border: 1px solid var(--adm-amberbd);
+    border-radius: var(--adm-radius);
+    font-size: 13px;
+    color: var(--adm-amber);
+    margin-bottom: 1.5rem;
+  }
+  .rf-restore[hidden] { display: none; }
+
+  .rf-restore__link {
+    background: none;
+    border: none;
+    color: var(--adm-amber);
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+  }
+  .rf-restore__link:hover { text-decoration: none; }
+
+  .rf-restore__dismiss {
+    font-size: 11px;
+    color: var(--adm-amber);
+    background: none;
+    border: 1px solid var(--adm-amberbd);
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .rf-restore__dismiss:hover { background: rgba(146, 64, 14, 0.08); }
+
+  /* ── Two-column layout ───────────────────────────────────────────────────── */
+  .rf-layout {
+    display: grid;
+    grid-template-columns: 1fr 272px;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  /* ── Main editor ─────────────────────────────────────────────────────────── */
+  .rf-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* ── Fields ──────────────────────────────────────────────────────────────── */
+  .rf-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .rf-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--adm-txt3);
+    display: block;
+  }
+
+  .rf-required { color: var(--adm-accent); }
+
+  .rf-hint {
+    font-size: 11px;
+    color: var(--adm-txt3);
+  }
+
+  /* ── Base input / textarea / select ─────────────────────────────────────── */
+  .rf-input,
+  .rf-textarea,
+  .rf-select {
+    width: 100%;
+    background: var(--adm-bg2);
+    border: 1px solid var(--adm-border);
+    border-radius: var(--adm-radius);
+    color: var(--adm-txt);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    padding: 0.5rem 0.75rem;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .rf-input:focus,
+  .rf-textarea:focus,
+  .rf-select:focus {
+    border-color: var(--adm-accent);
+    box-shadow: 0 0 0 3px var(--adm-accentbg);
+  }
+  .rf-input::placeholder,
+  .rf-textarea::placeholder { color: var(--adm-txt3); }
+
+  /* Editorial title input */
+  .rf-input--title {
+    font-family: 'Syne', sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    line-height: 1.3;
+    padding: 0.625rem 0.75rem;
+    border-color: var(--adm-border2);
+  }
+  .rf-input--title:focus { border-color: var(--adm-accent); }
+
+  /* Monospace (slug, content) */
+  .rf-input--mono {
+    font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+    font-size: 12px;
+  }
+
+  /* Slug compound input */
+  .rf-slug-row {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--adm-border);
+    border-radius: var(--adm-radius);
+    overflow: hidden;
+    background: var(--adm-bg2);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .rf-slug-row:focus-within {
+    border-color: var(--adm-accent);
+    box-shadow: 0 0 0 3px var(--adm-accentbg);
+  }
+  .rf-slug-prefix {
+    font-size: 12px;
+    color: var(--adm-txt3);
+    background: var(--adm-bg3);
+    border-right: 1px solid var(--adm-border);
+    padding: 0 0.625rem;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .rf-slug-input {
+    flex: 1;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .rf-slug-input:focus {
+    border: none;
+    box-shadow: none;
+  }
+
+  /* Textarea */
+  .rf-textarea { resize: vertical; line-height: 1.6; }
+
+  /* Code/content textarea */
+  .rf-textarea--code {
+    font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+    font-size: 12.5px;
+    line-height: 1.75;
+    border-top: none;
+    border-radius: 0 0 var(--adm-radius) var(--adm-radius);
+    resize: vertical;
+    min-height: 320px;
+  }
+  .rf-textarea--code:focus {
+    border-color: var(--adm-accent);
+    box-shadow: 0 0 0 3px var(--adm-accentbg);
+  }
+
+  /* Select with custom arrow */
+  .rf-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239b8c7e' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 2rem;
+    cursor: pointer;
+  }
+
+  /* ── Editor header (label + tab switcher) ────────────────────────────────── */
+  .rf-editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .rf-tabs { display: flex; gap: 2px; }
+
+  .rf-tab {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--adm-txt2);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .rf-tab:hover { color: var(--adm-txt); }
+  .rf-tab--active {
+    color: var(--adm-accent);
+    border-bottom-color: var(--adm-accent);
+  }
+
+  /* ── Formatting toolbar ──────────────────────────────────────────────────── */
+  .rf-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    background: var(--adm-bg3);
+    border: 1px solid var(--adm-border);
+    border-bottom: none;
+    border-radius: var(--adm-radius) var(--adm-radius) 0 0;
+    padding: 7px 8px;
+  }
+
+  .rf-toolbar-btn {
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--adm-txt2);
+    background: var(--adm-bg2);
+    border: 1px solid var(--adm-border);
+    border-radius: 3px;
+    padding: 2px 7px;
+    cursor: pointer;
+    line-height: 1.6;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .rf-toolbar-btn:hover {
+    background: var(--adm-accent);
+    color: #fff;
+    border-color: var(--adm-accent);
+  }
+
+  /* ── Preview panel ───────────────────────────────────────────────────────── */
+  .rf-preview {
+    border: 1px solid var(--adm-border);
+    border-radius: 0 0 var(--adm-radius) var(--adm-radius);
+    padding: 1.5rem;
+    min-height: 320px;
+    background: var(--adm-bg2);
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--adm-txt);
+  }
+  .rf-preview[hidden] { display: none; }
+
+  /* ── Sidebar ─────────────────────────────────────────────────────────────── */
+  .rf-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    position: sticky;
+    /* nav bar (52px) + rf-topbar (~45px) + margin (1.75rem ≈ 28px) */
+    top: 125px;
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
+
+  .rf-panel-body {
+    padding: 0.875rem 1rem;
+  }
+  .rf-panel-body--stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .rf-meta-note {
+    font-size: 11px;
+    color: var(--adm-txt3);
+    margin-top: 0.5rem;
+  }
+
+  /* ── Tags ────────────────────────────────────────────────────────────────── */
+  .rf-tags-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-top: 0.25rem;
+  }
+  .rf-tag-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--adm-txt2);
+    cursor: pointer;
+    transition: color 0.15s;
+    padding: 2px 0;
+  }
+  .rf-tag-label:hover .rf-tag-name { color: var(--adm-accent); }
+  .rf-tag-check { accent-color: var(--adm-accent); flex-shrink: 0; }
+  .rf-tag-name { line-height: 1.3; }
+
+  /* ── Cover preview ───────────────────────────────────────────────────────── */
+  .rf-cover-preview { margin-top: 0.625rem; }
+  .rf-cover-preview[hidden] { display: none; }
+  .rf-cover-img {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    border-radius: var(--adm-radius);
+    border: 1px solid var(--adm-border);
+    display: block;
+  }
+
+  /* ── Error banner ────────────────────────────────────────────────────────── */
+  .rf-error {
+    margin-top: 1.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--adm-redbg);
+    border: 1px solid var(--adm-redbd);
+    border-radius: var(--adm-radius);
+    font-size: 13px;
+    color: var(--adm-red);
+  }
+  .rf-error[hidden] { display: none; }
 </style>
 
 <script define:vars={{ submitUrl, submitMethod, isEdit }}>
   // ── Slug auto-generation ──────────────────────────────────────────────────
-  const titleEl = document.getElementById('title');
-  const slugEl = document.getElementById('slug');
+  const titleEl  = document.getElementById('title');
+  const slugEl   = document.getElementById('slug');
   const summaryEl = document.getElementById('summary');
+  const contentEl = document.getElementById('content');
   let slugEdited = slugEl.value.length > 0 && isEdit;
 
   function clientSlugify(text) {
@@ -294,64 +676,65 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
   slugEl.addEventListener('input', () => { slugEdited = slugEl.value.length > 0; });
 
   // ── Cover image preview ───────────────────────────────────────────────────
-  const coverInput = document.getElementById('coverImage');
+  const coverInput   = document.getElementById('coverImage');
   const coverPreview = document.getElementById('cover-preview');
-  const coverImg = document.getElementById('cover-img');
+  const coverImg     = document.getElementById('cover-img');
 
   function updateCoverPreview() {
     const url = coverInput.value.trim();
-    if (url) { coverImg.src = url; coverPreview.classList.remove('hidden'); }
-    else { coverPreview.classList.add('hidden'); }
+    if (url) { coverImg.src = url; coverPreview.hidden = false; }
+    else     { coverPreview.hidden = true; }
   }
   coverInput.addEventListener('input', updateCoverPreview);
   updateCoverPreview();
 
-  // ── Write / Preview tabs ──────────────────────────────────────────────────
-  const tabWrite = document.getElementById('tab-write');
+  // ── Write / Preview tab switcher ─────────────────────────────────────────
+  const tabWrite   = document.getElementById('tab-write');
   const tabPreview = document.getElementById('tab-preview');
-  const writePanel = document.getElementById('write-panel');
+  const writePanel  = document.getElementById('write-panel');
   const previewPanel = document.getElementById('preview-panel');
-  const toolbar = document.getElementById('editor-toolbar');
-  const contentEl = document.getElementById('content');
+  const toolbar     = document.getElementById('editor-toolbar');
 
-  const activeTab = 'border-b-2 border-madrid-red text-madrid-red';
-  const inactiveTab = 'border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+  function activateTab(active, inactive, showEl, hideEl) {
+    active.classList.add('rf-tab--active');
+    active.setAttribute('aria-selected', 'true');
+    inactive.classList.remove('rf-tab--active');
+    inactive.setAttribute('aria-selected', 'false');
+    showEl.hidden = false;
+    hideEl.hidden = true;
+  }
 
   tabWrite.addEventListener('click', () => {
-    tabWrite.className = `px-4 py-2 text-sm font-medium -mb-px ${activeTab}`;
-    tabPreview.className = `px-4 py-2 text-sm font-medium -mb-px ${inactiveTab}`;
-    writePanel.classList.remove('hidden');
-    previewPanel.classList.add('hidden');
-    toolbar.classList.remove('hidden');
+    activateTab(tabWrite, tabPreview, writePanel, previewPanel);
+    toolbar.hidden = false;
   });
 
   tabPreview.addEventListener('click', () => {
-    tabPreview.className = `px-4 py-2 text-sm font-medium -mb-px ${activeTab}`;
-    tabWrite.className = `px-4 py-2 text-sm font-medium -mb-px ${inactiveTab}`;
-    previewPanel.classList.remove('hidden');
-    writePanel.classList.add('hidden');
-    toolbar.classList.add('hidden');
-    previewPanel.innerHTML = contentEl.value || '<p class="text-gray-400 italic">Sin contenido</p>';
+    activateTab(tabPreview, tabWrite, previewPanel, writePanel);
+    toolbar.hidden = true;
+    previewPanel.innerHTML = contentEl.value
+      || '<p style="color:var(--adm-txt3);font-style:italic">Sin contenido</p>';
   });
 
   // ── Toolbar formatting ────────────────────────────────────────────────────
-  document.querySelectorAll('.toolbar-btn').forEach((btn) => {
+  document.querySelectorAll('.rf-toolbar-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const tag = btn.dataset.tag;
+      const tag   = btn.dataset.tag;
       const close = btn.dataset.close;
-      const start = contentEl.selectionStart;
-      const end = contentEl.selectionEnd;
+      const start    = contentEl.selectionStart;
+      const end      = contentEl.selectionEnd;
       const selected = contentEl.value.substring(start, end);
-      const before = contentEl.value.substring(0, start);
-      const after = contentEl.value.substring(end);
-      contentEl.value = before + tag + selected + close + after;
+      contentEl.value =
+        contentEl.value.substring(0, start) +
+        tag + selected + close +
+        contentEl.value.substring(end);
       contentEl.selectionStart = start + tag.length;
-      contentEl.selectionEnd = start + tag.length + selected.length;
+      contentEl.selectionEnd   = start + tag.length + selected.length;
       contentEl.focus();
     });
   });
 
-  // ── Autosave (new reports only) ──────────────────────────────────────────
+  // ── Autosave (new reports only) ───────────────────────────────────────────
   const DRAFT_KEY = 'adm-draft-new';
   const autosaveStatus = document.getElementById('autosave-status');
   let autosaveTimer = null;
@@ -364,8 +747,8 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
 
   function saveLocally() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
-      title: titleEl.value,
-      slug: slugEl.value,
+      title:   titleEl.value,
+      slug:    slugEl.value,
       summary: summaryEl.value,
       content: contentEl.value,
       ts: Date.now(),
@@ -374,31 +757,29 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
   }
 
   if (!isEdit) {
-    // Offer restore if local draft exists
     try {
       const stored = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
       if (stored?.title) {
         const banner = document.getElementById('restore-banner');
         if (banner) {
-          banner.classList.remove('hidden');
+          banner.hidden = false;
           document.getElementById('restore-btn')?.addEventListener('click', () => {
-            titleEl.value    = stored.title   || '';
-            slugEl.value     = stored.slug    || '';
-            summaryEl.value  = stored.summary || '';
-            contentEl.value  = stored.content || '';
+            titleEl.value   = stored.title   || '';
+            slugEl.value    = stored.slug    || '';
+            summaryEl.value = stored.summary || '';
+            contentEl.value = stored.content || '';
             slugEdited = Boolean(stored.slug);
-            banner.classList.add('hidden');
+            banner.hidden = true;
             setAutosaveLabel('Borrador restaurado');
           });
           document.getElementById('restore-dismiss')?.addEventListener('click', () => {
             localStorage.removeItem(DRAFT_KEY);
-            banner.classList.add('hidden');
+            banner.hidden = true;
           });
         }
       }
     } catch {}
 
-    // Schedule autosave on changes
     [titleEl, summaryEl, contentEl].forEach(el => {
       el.addEventListener('input', () => {
         clearTimeout(autosaveTimer);
@@ -413,16 +794,16 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
   const statusBadge = document.getElementById('status-badge');
 
   const toast = (msg, type = 'success') =>
-    requestAnimationFrame(() => (window).toast?.(msg, type));
+    requestAnimationFrame(() => window.toast?.(msg, type));
 
   function showError(msg) {
     errorBanner.textContent = msg;
-    errorBanner.classList.remove('hidden');
+    errorBanner.hidden = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function submit(targetStatus) {
-    errorBanner.classList.add('hidden');
+    errorBanner.hidden = true;
     statusInput.value = targetStatus;
 
     const title   = titleEl.value.trim();
@@ -436,11 +817,12 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
     const tags = [...document.querySelectorAll('input[name="tags"]:checked')].map(el => el.value);
     const payload = {
       title, summary, content,
-      slug: slugEl.value.trim() || undefined,
-      category: document.getElementById('category').value,
+      slug:       slugEl.value.trim() || undefined,
+      category:   document.getElementById('category').value,
       districtId: document.getElementById('districtId').value || null,
       coverImage: document.getElementById('coverImage').value.trim() || null,
-      status: targetStatus, tags,
+      status: targetStatus,
+      tags,
     };
 
     const btn = targetStatus === 'published'
@@ -451,7 +833,7 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
     btn.disabled = true;
 
     try {
-      const res = await fetch(submitUrl, {
+      const res  = await fetch(submitUrl, {
         method: submitMethod,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -463,14 +845,13 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
         localStorage.removeItem(DRAFT_KEY);
         window.location.href = `/admin/reports/${data.id}/edit`;
       } else {
-        // Update status badge inline
-        statusBadge.textContent = targetStatus === 'published' ? 'Publicado' : 'Borrador';
-        statusBadge.className = `inline-block text-xs font-medium px-2 py-1 rounded ${
-          targetStatus === 'published' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-        }`;
+        const isPublished = targetStatus === 'published';
+        statusBadge.innerHTML =
+          `<span class="adm-badge__dot"></span>${isPublished ? 'Publicado' : 'Borrador'}`;
+        statusBadge.className = `adm-badge ${isPublished ? 'adm-badge--published' : 'adm-badge--draft'}`;
         document.getElementById('btn-publish').textContent =
-          targetStatus === 'published' ? 'Actualizar' : 'Publicar';
-        toast(targetStatus === 'published' ? 'Publicado correctamente' : 'Guardado como borrador');
+          isPublished ? 'Actualizar' : 'Publicar';
+        toast(isPublished ? 'Publicado correctamente' : 'Guardado como borrador');
       }
     } catch {
       showError('Error de red. Inténtalo de nuevo.');
@@ -480,10 +861,10 @@ const submitMethod = isEdit ? 'PATCH' : 'POST';
     }
   }
 
-  document.getElementById('btn-draft').addEventListener('click', () => submit('draft'));
-  document.getElementById('btn-publish').addEventListener('click', () => submit('published'));
+  document.getElementById('btn-draft').addEventListener('click',   () => submit('draft'));
+  document.getElementById('btn-publish').addEventListener('click',  () => submit('published'));
 
-  // ── ⌘S shortcut ─────────────────────────────────────────────────────────
+  // ── ⌘S shortcut ──────────────────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 's') {
       e.preventDefault();

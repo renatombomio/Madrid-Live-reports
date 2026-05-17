@@ -43,11 +43,6 @@ const fmtDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle
       <div class={`adm-stat__value ${data.reports.draft > 0 ? 'adm-stat__value--amber' : ''}`}>{data.reports.draft}</div>
       <div class="adm-stat__label">Borradores pendientes</div>
     </div>
-    <div class="adm-stat">
-      <div class="adm-stat__value">{data.news.published}</div>
-      <div class="adm-stat__label">Noticias publicadas</div>
-      {data.news.draft > 0 && <div class="adm-stat__sub">{data.news.draft} en borrador</div>}
-    </div>
   </div>
 
   <!-- ── Two-column middle ──────────────────────────────────────────────────── -->
@@ -179,7 +174,7 @@ const fmtDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle
   .dash-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
   .dash-stats {
-    display: grid; grid-template-columns: repeat(4, 1fr);
+    display: grid; grid-template-columns: repeat(3, 1fr);
     gap: 1px; background: var(--adm-border);
     border: 1px solid var(--adm-border); border-radius: var(--adm-radius);
     overflow: hidden; margin-bottom: 1.25rem;
