@@ -15,6 +15,15 @@ export const auth = betterAuth({
     },
   }),
 
+  // `role` lives on the `user` table (see db/schema/auth.ts) but better-auth
+  // only surfaces columns it's told about — declare it so the inferred
+  // session type carries it. Not settable at signup; defaults to 'viewer'.
+  user: {
+    additionalFields: {
+      role: { type: 'string', input: false },
+    },
+  },
+
   // Email + password is the primary auth method for editors/admins
   emailAndPassword: {
     enabled: true,
