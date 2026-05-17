@@ -24,25 +24,37 @@ const [
   activitySignals,
 ] = await Promise.all([getHomepageData(), getActivitySignals()]);
 
-const sidebarSignals = [
-  activitySignals.trendingDistricts[0] && {
+type Signal = { label: string; value: string; sub?: string; href?: string };
+
+const sidebarSignals: Signal[] = [];
+
+const topDistrict = activitySignals.trendingDistricts[0];
+if (topDistrict) {
+  sidebarSignals.push({
     label: 'Distrito más activo esta semana',
-    value: activitySignals.trendingDistricts[0].name,
-    sub:   `${activitySignals.trendingDistricts[0].weekCount} reportes esta semana`,
-    href:  `/districts/${activitySignals.trendingDistricts[0].slug}`,
-  },
-  activitySignals.hotCategories[0] && {
+    value: topDistrict.name,
+    sub:   `${topDistrict.weekCount} reportes esta semana`,
+    href:  `/districts/${topDistrict.slug}`,
+  });
+}
+
+const topCategory = activitySignals.hotCategories[0];
+if (topCategory) {
+  sidebarSignals.push({
     label: 'Categoría destacada',
-    value: CATEGORY_DISPLAY[activitySignals.hotCategories[0].category]?.name ?? activitySignals.hotCategories[0].category,
-    sub:   `${activitySignals.hotCategories[0].weekCount} publicaciones esta semana`,
-    href:  `/search?category=${activitySignals.hotCategories[0].category}`,
-  },
-  activitySignals.weekTotal > 0 && {
+    value: CATEGORY_DISPLAY[topCategory.category]?.name ?? topCategory.category,
+    sub:   `${topCategory.weekCount} publicaciones esta semana`,
+    href:  `/search?category=${topCategory.category}`,
+  });
+}
+
+if (activitySignals.weekTotal > 0) {
+  sidebarSignals.push({
     label: 'Esta semana',
     value: `${activitySignals.weekTotal} ${activitySignals.weekTotal === 1 ? 'reporte nuevo' : 'reportes nuevos'}`,
     sub:   activitySignals.happeningNow > 0 ? `${activitySignals.happeningNow} en las últimas 24h` : undefined,
-  },
-].filter((s): s is { label: string; value: string; sub?: string; href?: string } => Boolean(s));
+  });
+}
 
 // Map raw category stats to CategoriesGrid shape
 const categoryGridItems = categoryItems?.map(c => ({

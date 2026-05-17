@@ -455,9 +455,9 @@ export async function getActivitySignals() {
 // ── Related content ───────────────────────────────────────────────────────────
 
 export async function getRelatedReports(
-  reportId: number,
+  reportId: string,
   category: string,
-  districtId: number | null,
+  districtId: string | null,
 ) {
   const [byCategory, byDistrict] = await Promise.all([
     db.select({
