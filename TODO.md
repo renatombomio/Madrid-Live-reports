@@ -13,15 +13,21 @@ lands; new items are appended under "Next".
 - [x] Track `flake.lock` in git
 - [x] Unit tests for `format`, `slugify`, and `content-labels` helpers
 - [x] Add `README.md`, project `CLAUDE.md`, and this roadmap
+- [x] Schema-integrity tests — enum ↔ label-metadata cross-checks, table
+      column presence (38 unit tests across 5 files)
 
 ## Next
 
 ### Testing
 - [ ] Integration tests for the query layer (`lib/data/queries.ts`,
       `admin-queries.ts`) — all 11 query functions are untested; needs a
-      disposable test Postgres
-- [ ] Expand e2e coverage beyond the home page — admin CRUD, search, district
-      pages
+      disposable test Postgres. Candidates: `getHomepageData`,
+      `getDistrictDetail`, `searchContent`, `getActivitySignals`,
+      `getRelatedReports`, `getAdminOverview`, `getAdminReportsList`
+- [ ] Expand e2e coverage beyond the home page — admin login + CRUD, search
+      filters, district pages, news detail
+- [ ] Cover the admin API routes (`api/admin/reports/*`) — auth gating,
+      bulk ops, duplicate
 - [ ] Enforce a coverage threshold in `vitest.config.ts`
 
 ### Build & tooling
