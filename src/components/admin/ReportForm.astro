@@ -760,6 +760,15 @@ const updatedAt = isEdit && report?.updatedAt
   const contentEl  = document.getElementById('content');
   let   slugEdited = slugEl.value.length > 0 && isEdit;
 
+  // ── Unsaved-changes guard ─────────────────────────────────────────────────
+  let isDirty = false;
+  const markDirty = () => { isDirty = true; };
+  window.addEventListener('beforeunload', (e) => {
+    if (!isDirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
   // ── Auto-grow textareas ───────────────────────────────────────────────────
   function autoGrow(el, minH = 0) {
     el.style.height = 'auto';
@@ -781,8 +790,14 @@ const updatedAt = isEdit && report?.updatedAt
   }
   titleEl.addEventListener('input', () => {
     if (!slugEdited) slugEl.value = clientSlugify(titleEl.value);
+    markDirty();
   });
-  slugEl.addEventListener('input', () => { slugEdited = slugEl.value.length > 0; });
+  slugEl.addEventListener('input', () => {
+    slugEdited = slugEl.value.length > 0;
+    markDirty();
+  });
+  summaryEl.addEventListener('input', markDirty);
+  contentEl.addEventListener('input', markDirty);
 
   // ── Tag pill checked-state sync (JS fallback for :has()) ──────────────────
   document.querySelectorAll('.rf-tag-check').forEach((cb) => {
@@ -956,15 +971,22 @@ const updatedAt = isEdit && report?.updatedAt
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { showError(data.error ?? `Error ${res.status}`); return; }
 
+      isDirty = false;
+
       if (!isEdit) {
         localStorage.removeItem(DRAFT_KEY);
         window.location.href = `/admin/reports/${data.id}/edit`;
       } else {
-        const pub = targetStatus === 'published';
+        const pub  = targetStatus === 'published';
+        const slug = data.slug ?? slugEl.value.trim();
         statusBadge.className = `rf-insp-badge ${pub ? 'rf-insp-badge--published' : 'rf-insp-badge--draft'}`;
         statusBadge.querySelector('.rf-insp-text').textContent = pub ? 'Publicado' : 'Borrador';
         document.getElementById('btn-publish').textContent = pub ? 'Actualizar' : 'Publicar';
-        toast(pub ? 'Publicado correctamente' : 'Guardado como borrador');
+        toast(
+          pub
+            ? `Publicado · /reportes/${slug}`
+            : 'Guardado como borrador'
+        );
       }
     } catch {
       showError('Error de red. Inténtalo de nuevo.');
