@@ -19,6 +19,7 @@ const isEdit = mode === 'edit';
 const submitUrl = isEdit ? `/api/admin/reports/${report!.id}` : '/api/admin/reports';
 const submitMethod = isEdit ? 'PATCH' : 'POST';
 
+const isPublished = report?.status === 'published';
 const updatedAt = isEdit && report?.updatedAt
   ? new Date(report.updatedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
   : null;
@@ -26,227 +27,199 @@ const updatedAt = isEdit && report?.updatedAt
 
 <form id="report-form" class="rf-form" novalidate>
 
-  <!-- ── Sticky actions bar ─────────────────────────────────────────── -->
+  <!-- ── Sticky action bar ──────────────────────────────────────────────── -->
   <div class="rf-topbar">
     <a href="/admin/reports" class="rf-back">← Reportes</a>
     <span id="autosave-status" class="rf-autosave" aria-live="polite"></span>
     <div class="rf-topbar__actions">
-      <kbd class="rf-kbd" title="Guardar borrador">⌘S</kbd>
-      <button type="button" id="btn-draft" class="adm-btn adm-btn--ghost adm-btn--sm">
-        Borrador
-      </button>
+      <button type="button" id="btn-draft" class="adm-btn adm-btn--ghost adm-btn--sm"
+        title="Guardar borrador (⌘S)">Borrador</button>
       <button type="button" id="btn-publish" class="adm-btn adm-btn--sm">
-        {isEdit && report?.status === 'published' ? 'Actualizar' : 'Publicar'}
+        {isEdit && isPublished ? 'Actualizar' : 'Publicar'}
       </button>
     </div>
   </div>
 
-  <!-- ── Restore-draft banner (new reports only) ───────────────────── -->
+  <!-- ── Restore-draft banner ───────────────────────────────────────────── -->
   {!isEdit && (
     <div id="restore-banner" class="rf-restore" hidden>
-      <span>
-        Hay un borrador guardado localmente.{' '}
+      <span>Hay un borrador guardado localmente.{' '}
         <button id="restore-btn" class="rf-restore__link">Restaurar</button>
       </span>
       <button id="restore-dismiss" class="rf-restore__dismiss">Descartar</button>
     </div>
   )}
 
-  <!-- ── Two-column workspace ──────────────────────────────────────── -->
+  <!-- ── Two-column workspace ───────────────────────────────────────────── -->
   <div class="rf-layout">
 
-    <!-- ── Main editor column ──────────────────────────────────────── -->
+    <!-- ── Document surface ──────────────────────────────────────────────── -->
     <div class="rf-main">
+      <div class="rf-doc">
 
-      <!-- Title -->
-      <div class="rf-field">
-        <label for="title" class="rf-label">
-          Título <span class="rf-required">*</span>
-        </label>
-        <input
-          id="title"
-          name="title"
-          type="text"
-          required
-          value={report?.title ?? ''}
-          placeholder="El título del informe"
-          class="rf-input rf-input--title"
-        />
-      </div>
-
-      <!-- Slug -->
-      <div class="rf-field">
-        <label for="slug" class="rf-label">Slug (URL)</label>
-        <div class="rf-slug-row">
-          <span class="rf-slug-prefix">/reports/</span>
-          <input
-            id="slug"
-            name="slug"
-            type="text"
-            value={report?.slug ?? ''}
-            placeholder="se-genera-del-titulo"
-            class="rf-input rf-input--mono rf-slug-input"
-          />
+        <!-- Title + slug -->
+        <div class="rf-doc-hed">
+          <textarea
+            id="title"
+            name="title"
+            required
+            rows="1"
+            placeholder="Título del informe"
+            class="rf-title-input"
+            autocomplete="off"
+            spellcheck="true"
+          >{report?.title ?? ''}</textarea>
+          <div class="rf-url-row">
+            <span class="rf-url-label">madridlive.es/reportes/</span><input
+              id="slug"
+              name="slug"
+              type="text"
+              value={report?.slug ?? ''}
+              placeholder="slug-del-reporte"
+              class="rf-url-slug"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
         </div>
-        <p class="rf-hint">Se auto-genera del título. Edítalo para personalizarlo.</p>
-      </div>
 
-      <!-- Summary -->
-      <div class="rf-field">
-        <label for="summary" class="rf-label">
-          Resumen <span class="rf-required">*</span>
-        </label>
-        <textarea
-          id="summary"
-          name="summary"
-          required
-          rows="3"
-          placeholder="Descripción breve que aparece en las tarjetas y el SEO"
-          class="rf-textarea"
-        >{report?.summary ?? ''}</textarea>
-      </div>
+        <!-- Summary -->
+        <div class="rf-doc-summary">
+          <textarea
+            id="summary"
+            name="summary"
+            required
+            rows="2"
+            placeholder="Resumen — aparece en las tarjetas y el SEO"
+            class="rf-summary-input"
+          >{report?.summary ?? ''}</textarea>
+        </div>
 
-      <!-- Content editor -->
-      <div class="rf-field">
-        <div class="rf-editor-head">
-          <span class="rf-label">Contenido <span class="rf-required">*</span></span>
+        <!-- Editor control strip -->
+        <div class="rf-editor-strip">
+          <div id="editor-toolbar" class="rf-toolbar" aria-label="Herramientas de formato">
+            {[
+              { label: 'B',   title: 'Negrita',         tag: '<strong>',     close: '</strong>'     },
+              { label: 'I',   title: 'Cursiva',          tag: '<em>',         close: '</em>'         },
+              { sep: true },
+              { label: 'H2',  title: 'Título H2',        tag: '<h2>',         close: '</h2>'         },
+              { label: 'H3',  title: 'Subtítulo H3',     tag: '<h3>',         close: '</h3>'         },
+              { label: '¶',   title: 'Párrafo',          tag: '<p>',          close: '</p>'          },
+              { sep: true },
+              { label: '🔗',  title: 'Enlace',           tag: '<a href="">',  close: '</a>'          },
+              { label: '<>',  title: 'Código inline',    tag: '<code>',       close: '</code>'       },
+              { label: '```', title: 'Bloque de código', tag: '<pre><code>',  close: '</code></pre>' },
+              { sep: true },
+              { label: '❝',   title: 'Cita',             tag: '<blockquote>', close: '</blockquote>' },
+              { label: '─',   title: 'Separador',        tag: '<hr />',       close: ''              },
+            ].map((item: any) =>
+              item.sep
+                ? <span class="rf-toolbar-sep" aria-hidden="true"></span>
+                : <button type="button" title={item.title} data-tag={item.tag} data-close={item.close}
+                    class="rf-toolbar-btn">{item.label}</button>
+            )}
+          </div>
           <div class="rf-tabs" role="tablist">
             <button type="button" id="tab-write" role="tab" aria-selected="true"
               class="rf-tab rf-tab--active">Editar</button>
             <button type="button" id="tab-preview" role="tab" aria-selected="false"
-              class="rf-tab">Vista previa</button>
+              class="rf-tab">Previsualizar</button>
           </div>
         </div>
 
-        <!-- Toolbar -->
-        <div id="editor-toolbar" class="rf-toolbar" aria-label="Herramientas de formato">
-          {[
-            { label: 'B',   title: 'Negrita',         tag: '<strong>',     close: '</strong>'     },
-            { label: 'I',   title: 'Cursiva',          tag: '<em>',         close: '</em>'         },
-            { label: 'H2',  title: 'Título H2',        tag: '<h2>',         close: '</h2>'         },
-            { label: 'H3',  title: 'Subtítulo H3',     tag: '<h3>',         close: '</h3>'         },
-            { label: '¶',   title: 'Párrafo',          tag: '<p>',          close: '</p>'          },
-            { label: '🔗',  title: 'Enlace',           tag: '<a href="">',  close: '</a>'          },
-            { label: '<>',  title: 'Código inline',    tag: '<code>',       close: '</code>'       },
-            { label: '```', title: 'Bloque de código', tag: '<pre><code>',  close: '</code></pre>' },
-            { label: '❝',   title: 'Cita',             tag: '<blockquote>', close: '</blockquote>' },
-            { label: '─',   title: 'Separador',        tag: '<hr />',       close: ''              },
-          ].map(({ label, title, tag, close }) => (
-            <button
-              type="button"
-              title={title}
-              data-tag={tag}
-              data-close={close}
-              class="rf-toolbar-btn"
-            >{label}</button>
-          ))}
+        <!-- Writing canvas -->
+        <div class="rf-doc-content">
+          <div id="write-panel">
+            <textarea
+              id="content"
+              name="content"
+              required
+              placeholder="Empieza a escribir el reporte…"
+              class="rf-content-input"
+            >{report?.content ?? ''}</textarea>
+          </div>
+          <div id="preview-panel" class="rf-preview" hidden></div>
         </div>
 
-        <!-- Write panel -->
-        <div id="write-panel">
-          <textarea
-            id="content"
-            name="content"
-            required
-            rows="22"
-            placeholder="<p>Escribe el contenido del informe en HTML...</p>"
-            class="rf-textarea rf-textarea--code"
-          >{report?.content ?? ''}</textarea>
-        </div>
-
-        <!-- Preview panel -->
-        <div id="preview-panel" class="rf-preview" hidden></div>
       </div>
-
     </div>
 
-    <!-- ── Metadata sidebar ──────────────────────────────────────────── -->
+    <!-- ── Inspector sidebar ─────────────────────────────────────────────── -->
     <aside class="rf-sidebar">
 
-      <!-- Status panel -->
-      <div class="adm-panel">
-        <div class="adm-panel__head">Estado</div>
-        <div class="rf-panel-body">
-          <div
-            id="status-badge"
-            class={`adm-badge ${report?.status === 'published' ? 'adm-badge--published' : 'adm-badge--draft'}`}
-          >
-            <span class="adm-badge__dot"></span>
-            {report?.status === 'published' ? 'Publicado' : 'Borrador'}
+      <!-- Publication inspector -->
+      <div class="rf-inspector">
+
+        <!-- Status -->
+        <div class="rf-insp-status">
+          <div id="status-badge"
+            class={`rf-insp-badge ${isPublished ? 'rf-insp-badge--published' : 'rf-insp-badge--draft'}`}>
+            <span class="rf-insp-dot"></span>
+            <span class="rf-insp-text">{isPublished ? 'Publicado' : 'Borrador'}</span>
           </div>
+          {updatedAt && <span class="rf-insp-ts">{updatedAt}</span>}
           <input type="hidden" id="status-input" name="status" value={report?.status ?? 'draft'} />
-          {updatedAt && <p class="rf-meta-note">Actualizado {updatedAt}</p>}
         </div>
+
+        <!-- Category -->
+        <div class="rf-insp-field">
+          <label for="category" class="rf-insp-label">
+            Categoría <span class="rf-insp-req">*</span>
+          </label>
+          <select id="category" name="category" class="rf-insp-select">
+            {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+              <option value={value} selected={report?.category === value}>{label}</option>
+            ))}
+          </select>
+        </div>
+
+        <!-- District -->
+        <div class="rf-insp-field">
+          <label for="districtId" class="rf-insp-label">Distrito</label>
+          <select id="districtId" name="districtId" class="rf-insp-select">
+            <option value="">— Toda la ciudad —</option>
+            {districtList.map((d) => (
+              <option value={d.id} selected={report?.districtId === d.id}>{d.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <!-- Tags -->
+        <div class="rf-insp-field rf-insp-field--tags">
+          <p class="rf-insp-label">Etiquetas</p>
+          <div class="rf-tag-cloud">
+            {tagList.map((tag) => (
+              <label class:list={['rf-tag-pill', { 'is-checked': report?.tagIds?.includes(tag.id) }]}>
+                <input
+                  type="checkbox"
+                  name="tags"
+                  value={tag.id}
+                  checked={report?.tagIds?.includes(tag.id)}
+                  class="rf-tag-check"
+                />
+                {tag.name}
+              </label>
+            ))}
+          </div>
+        </div>
+
       </div>
 
-      <!-- Metadata panel -->
-      <div class="adm-panel">
-        <div class="adm-panel__head">Metadatos</div>
-        <div class="rf-panel-body rf-panel-body--stack">
-
-          <!-- Category -->
-          <div class="rf-field">
-            <label for="category" class="rf-label">
-              Categoría <span class="rf-required">*</span>
-            </label>
-            <select id="category" name="category" class="rf-select">
-              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                <option value={value} selected={report?.category === value}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <!-- District -->
-          <div class="rf-field">
-            <label for="districtId" class="rf-label">Distrito</label>
-            <select id="districtId" name="districtId" class="rf-select">
-              <option value="">— Toda la ciudad —</option>
-              {districtList.map((d) => (
-                <option value={d.id} selected={report?.districtId === d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <!-- Tags -->
-          <div class="rf-field">
-            <p class="rf-label">Etiquetas</p>
-            <div class="rf-tags-grid">
-              {tagList.map((tag) => (
-                <label class="rf-tag-label">
-                  <input
-                    type="checkbox"
-                    name="tags"
-                    value={tag.id}
-                    checked={report?.tagIds?.includes(tag.id)}
-                    class="rf-tag-check"
-                  />
-                  <span class="rf-tag-name">{tag.name}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
+      <!-- Cover inspector -->
+      <div class="rf-inspector">
+        <div class="rf-insp-field">
+          <label for="coverImage" class="rf-insp-label">Imagen de portada</label>
+          <input
+            id="coverImage"
+            name="coverImage"
+            type="url"
+            value={report?.coverImage ?? ''}
+            placeholder="https://…"
+            class="rf-insp-input"
+          />
         </div>
-      </div>
-
-      <!-- Cover image panel -->
-      <div class="adm-panel">
-        <div class="adm-panel__head">Imagen de portada</div>
-        <div class="rf-panel-body">
-          <div class="rf-field">
-            <label for="coverImage" class="rf-label">URL</label>
-            <input
-              id="coverImage"
-              name="coverImage"
-              type="url"
-              value={report?.coverImage ?? ''}
-              placeholder="https://…"
-              class="rf-input"
-            />
-          </div>
-          <div id="cover-preview" class="rf-cover-preview" hidden>
-            <img id="cover-img" src="" alt="Vista previa" class="rf-cover-img" />
-          </div>
+        <div id="cover-preview" class="rf-cover-preview" hidden>
+          <img id="cover-img" src="" alt="Vista previa" class="rf-cover-img" />
         </div>
       </div>
 
@@ -259,30 +232,22 @@ const updatedAt = isEdit && report?.updatedAt
 </form>
 
 <style>
-  /* ── Form shell ──────────────────────────────────────────────────────────── */
-  .rf-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
+  /* ── Shell ───────────────────────────────────────────────────────────────── */
+  .rf-form { display: flex; flex-direction: column; }
 
   /* ── Sticky action bar ───────────────────────────────────────────────────── */
   .rf-topbar {
     position: sticky;
-    top: 52px; /* sits flush below .adm-bar */
+    top: 52px;
     z-index: 90;
     background: var(--adm-bg);
     border-bottom: 1px solid var(--adm-border);
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.5rem 0;
-    margin-bottom: 1.75rem;
-    /* extend to cover adm-main padding so bg is flush */
-    margin-left: -1.5rem;
-    margin-right: -1.5rem;
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    height: 48px;
+    margin: 0 -1.5rem 2rem;
+    padding: 0 1.5rem;
   }
 
   .rf-back {
@@ -301,343 +266,478 @@ const updatedAt = isEdit && report?.updatedAt
     color: var(--adm-txt3);
     min-width: 0;
   }
-
-  .rf-topbar__actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
+  @keyframes rf-fadein {
+    from { opacity: 0; transform: translateY(-2px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
+  .rf-autosave:not(:empty) { animation: rf-fadein 0.2s ease; }
 
-  .rf-kbd {
-    font-size: 10px;
-    color: var(--adm-txt3);
-    background: var(--adm-bg3);
-    border: 1px solid var(--adm-border);
-    border-radius: 4px;
-    padding: 2px 6px;
-    font-family: inherit;
-    cursor: default;
-  }
+  .rf-topbar__actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
   /* ── Restore banner ──────────────────────────────────────────────────────── */
   .rf-restore {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.75rem 1rem;
-    background: var(--adm-amberbg);
-    border: 1px solid var(--adm-amberbd);
-    border-radius: var(--adm-radius);
-    font-size: 13px;
-    color: var(--adm-amber);
-    margin-bottom: 1.5rem;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+    background: var(--adm-amberbg); border: 1px solid var(--adm-amberbd);
+    border-radius: var(--adm-radius); font-size: 13px; color: var(--adm-amber);
   }
   .rf-restore[hidden] { display: none; }
-
   .rf-restore__link {
-    background: none;
-    border: none;
-    color: var(--adm-amber);
-    font-family: inherit;
-    font-size: inherit;
-    font-weight: 600;
-    text-decoration: underline;
-    cursor: pointer;
-    padding: 0;
+    background: none; border: none; padding: 0; font-family: inherit;
+    font-size: inherit; font-weight: 600; color: var(--adm-amber);
+    text-decoration: underline; cursor: pointer;
   }
   .rf-restore__link:hover { text-decoration: none; }
-
   .rf-restore__dismiss {
-    font-size: 11px;
-    color: var(--adm-amber);
-    background: none;
-    border: 1px solid var(--adm-amberbd);
-    border-radius: 4px;
-    padding: 3px 8px;
-    cursor: pointer;
-    font-family: inherit;
-    flex-shrink: 0;
-    transition: background 0.15s;
+    font-size: 11px; color: var(--adm-amber); background: none;
+    border: 1px solid var(--adm-amberbd); border-radius: 4px; padding: 3px 8px;
+    cursor: pointer; font-family: inherit; flex-shrink: 0; transition: background 0.15s;
   }
-  .rf-restore__dismiss:hover { background: rgba(146, 64, 14, 0.08); }
+  .rf-restore__dismiss:hover { background: rgba(146,64,14,0.08); }
 
   /* ── Two-column layout ───────────────────────────────────────────────────── */
   .rf-layout {
     display: grid;
-    grid-template-columns: 1fr 272px;
+    grid-template-columns: 1fr 252px;
     gap: 2rem;
     align-items: start;
   }
+  .rf-main { min-width: 0; }
 
-  /* ── Main editor ─────────────────────────────────────────────────────────── */
-  .rf-main {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+  /* ── Document card ───────────────────────────────────────────────────────── */
+  .rf-doc {
+    background: var(--adm-bg2);
+    border: 1px solid var(--adm-border);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    overflow: hidden;
+    transition: box-shadow 0.25s;
+  }
+  .rf-doc:focus-within {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 0 0 3px var(--adm-accentbg);
   }
 
-  /* ── Fields ──────────────────────────────────────────────────────────────── */
-  .rf-field {
+  /* ── Title + slug ────────────────────────────────────────────────────────── */
+  .rf-doc-hed { padding: 2.5rem 2.5rem 0; }
+
+  .rf-title-input {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'Syne', sans-serif;
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    line-height: 1.2;
+    color: var(--adm-txt);
+    padding: 0;
+    margin-bottom: 0.875rem;
+    resize: none;
+    overflow: hidden;
+    caret-color: var(--adm-accent);
+  }
+  .rf-title-input::placeholder { color: var(--adm-border); }
+  .rf-title-input::selection   { background: var(--adm-accentbg); }
+
+  .rf-url-row {
     display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
+    align-items: center;
+    padding-bottom: 1.25rem;
+    opacity: 0.42;
+    transition: opacity 0.2s;
+  }
+  .rf-url-row:hover,
+  .rf-url-row:focus-within { opacity: 1; }
+
+  .rf-url-label {
+    font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--adm-txt3);
+    white-space: nowrap;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .rf-url-slug {
+    font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--adm-txt3);
+    background: transparent;
+    border: none;
+    outline: none;
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    transition: color 0.15s;
+    caret-color: var(--adm-accent);
+  }
+  .rf-url-slug::placeholder { color: var(--adm-border2); }
+  .rf-url-slug:focus { color: var(--adm-accent); }
+
+  /* ── Summary ─────────────────────────────────────────────────────────────── */
+  .rf-doc-summary {
+    padding: 0 2.5rem 1.75rem;
+    border-bottom: 1px solid var(--adm-border);
+  }
+  .rf-summary-input {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--adm-txt2);
+    resize: none;
+    padding: 0;
+    min-height: 60px;
+    caret-color: var(--adm-accent);
+  }
+  .rf-summary-input::placeholder { color: var(--adm-border2); }
+  .rf-summary-input::selection   { background: var(--adm-accentbg); }
+
+  /* ── Editor control strip ────────────────────────────────────────────────── */
+  .rf-editor-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0 1.25rem 0 2.5rem;
+    height: 42px;
+    background: var(--adm-bg3);
+    border-bottom: 1px solid var(--adm-border);
+    overflow: hidden;
   }
 
-  .rf-label {
+  #editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  #editor-toolbar[hidden] { display: none; }
+
+  .rf-toolbar-btn {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--adm-txt3);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.12s, color 0.12s;
+  }
+  .rf-toolbar-btn:hover {
+    background: var(--adm-border);
+    color: var(--adm-txt2);
+  }
+
+  .rf-toolbar-sep {
+    display: inline-block;
+    width: 1px;
+    height: 14px;
+    background: var(--adm-border2);
+    margin: 0 4px;
+    flex-shrink: 0;
+    opacity: 0.6;
+  }
+
+  .rf-tabs { display: flex; flex-shrink: 0; }
+  .rf-tab {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--adm-txt3);
+    background: none;
+    border: none;
+    padding: 0 10px;
+    height: 42px;
+    cursor: pointer;
+    transition: color 0.15s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .rf-tab:hover { color: var(--adm-txt2); }
+  .rf-tab--active { color: var(--adm-accent); border-bottom-color: var(--adm-accent); }
+
+  /* ── Writing canvas ──────────────────────────────────────────────────────── */
+  .rf-doc-content { display: block; }
+
+  .rf-content-input {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.95;
+    color: var(--adm-txt);
+    resize: none;
+    padding: 2.5rem 2.5rem 4rem;
+    min-height: 520px;
+    caret-color: var(--adm-accent);
+  }
+  .rf-content-input::placeholder { color: var(--adm-border2); }
+  .rf-content-input::selection   { background: var(--adm-accentbg); }
+  .rf-content-input::-webkit-scrollbar       { width: 4px; }
+  .rf-content-input::-webkit-scrollbar-track { background: transparent; }
+  .rf-content-input::-webkit-scrollbar-thumb { background: var(--adm-border2); border-radius: 2px; }
+
+  /* ── Preview ─────────────────────────────────────────────────────────────── */
+  .rf-preview {
+    padding: 2.5rem 2.5rem 4rem;
+    min-height: 520px;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--adm-txt);
+  }
+  .rf-preview[hidden] { display: none; }
+
+  /* Prose typography for the preview */
+  .rf-preview :where(h2) {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.35em;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: var(--adm-txt);
+    margin: 2em 0 0.5em;
+    line-height: 1.25;
+  }
+  .rf-preview :where(h3) {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--adm-txt);
+    margin: 1.75em 0 0.4em;
+    line-height: 1.3;
+  }
+  .rf-preview :where(p)  { margin: 0 0 1em; }
+  .rf-preview :where(blockquote) {
+    border-left: 3px solid var(--adm-accent);
+    margin: 1.5em 0;
+    padding: 0.125em 0 0.125em 1.25rem;
+    color: var(--adm-txt2);
+    font-style: italic;
+  }
+  .rf-preview :where(code) {
+    font-family: 'SF Mono', 'Fira Mono', monospace;
+    font-size: 0.875em;
+    background: var(--adm-bg3);
+    border: 1px solid var(--adm-border);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .rf-preview :where(pre) {
+    background: var(--adm-bg3);
+    border: 1px solid var(--adm-border);
+    border-radius: var(--adm-radius);
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    margin: 1.25em 0;
+  }
+  .rf-preview :where(pre code) {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.875em;
+    line-height: 1.7;
+  }
+  .rf-preview :where(a)      { color: var(--adm-accent); }
+  .rf-preview :where(strong) { font-weight: 700; color: var(--adm-txt); }
+  .rf-preview :where(em)     { font-style: italic; }
+  .rf-preview :where(hr) {
+    border: none;
+    border-top: 1px solid var(--adm-border);
+    margin: 2em 0;
+  }
+
+  /* ── Inspector sidebar ───────────────────────────────────────────────────── */
+  .rf-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    position: sticky;
+    top: 120px;
+    max-height: calc(100vh - 135px);
+    overflow-y: auto;
+  }
+
+  .rf-inspector {
+    background: var(--adm-bg2);
+    border: 1px solid var(--adm-border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  /* ── Status row ──────────────────────────────────────────────────────────── */
+  .rf-insp-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid var(--adm-border);
+  }
+
+  .rf-insp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .rf-insp-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  @keyframes rf-dot-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  .rf-insp-badge--draft .rf-insp-dot {
+    background: var(--adm-amber);
+    animation: rf-dot-pulse 2.5s ease-in-out infinite;
+  }
+  .rf-insp-badge--draft .rf-insp-text { color: var(--adm-amber); }
+
+  .rf-insp-badge--published .rf-insp-dot { background: var(--adm-green); }
+  .rf-insp-badge--published .rf-insp-text { color: var(--adm-green); }
+
+  .rf-insp-ts {
+    font-size: 11px;
+    color: var(--adm-txt3);
+  }
+
+  /* ── Inspector fields ────────────────────────────────────────────────────── */
+  .rf-insp-field {
+    padding: 0.875rem 1rem 1rem;
+    border-bottom: 1px solid var(--adm-border);
+  }
+  .rf-insp-field:last-child { border-bottom: none; }
+  .rf-insp-field--tags { padding-bottom: 1rem; }
+
+  .rf-insp-label {
+    display: block;
     font-family: 'Syne', sans-serif;
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--adm-txt3);
-    display: block;
+    margin-bottom: 0.4rem;
   }
+  .rf-insp-req { color: var(--adm-accent); }
 
-  .rf-required { color: var(--adm-accent); }
-
-  .rf-hint {
-    font-size: 11px;
-    color: var(--adm-txt3);
-  }
-
-  /* ── Base input / textarea / select ─────────────────────────────────────── */
-  .rf-input,
-  .rf-textarea,
-  .rf-select {
+  .rf-insp-select,
+  .rf-insp-input {
     width: 100%;
-    background: var(--adm-bg2);
+    background: var(--adm-bg3);
     border: 1px solid var(--adm-border);
     border-radius: var(--adm-radius);
     color: var(--adm-txt);
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 13px;
-    padding: 0.5rem 0.75rem;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .rf-input:focus,
-  .rf-textarea:focus,
-  .rf-select:focus {
-    border-color: var(--adm-accent);
-    box-shadow: 0 0 0 3px var(--adm-accentbg);
-  }
-  .rf-input::placeholder,
-  .rf-textarea::placeholder { color: var(--adm-txt3); }
-
-  /* Editorial title input */
-  .rf-input--title {
-    font-family: 'Syne', sans-serif;
-    font-size: 21px;
-    font-weight: 700;
-    letter-spacing: -0.3px;
-    line-height: 1.3;
-    padding: 0.625rem 0.75rem;
-    border-color: var(--adm-border2);
-  }
-  .rf-input--title:focus { border-color: var(--adm-accent); }
-
-  /* Monospace (slug, content) */
-  .rf-input--mono {
-    font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
-    font-size: 12px;
-  }
-
-  /* Slug compound input */
-  .rf-slug-row {
-    display: flex;
-    align-items: stretch;
-    border: 1px solid var(--adm-border);
-    border-radius: var(--adm-radius);
-    overflow: hidden;
-    background: var(--adm-bg2);
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .rf-slug-row:focus-within {
-    border-color: var(--adm-accent);
-    box-shadow: 0 0 0 3px var(--adm-accentbg);
-  }
-  .rf-slug-prefix {
-    font-size: 12px;
-    color: var(--adm-txt3);
-    background: var(--adm-bg3);
-    border-right: 1px solid var(--adm-border);
-    padding: 0 0.625rem;
-    display: flex;
-    align-items: center;
-    white-space: nowrap;
-    flex-shrink: 0;
-    user-select: none;
-  }
-  .rf-slug-input {
-    flex: 1;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-  }
-  .rf-slug-input:focus {
-    border: none;
-    box-shadow: none;
-  }
-
-  /* Textarea */
-  .rf-textarea { resize: vertical; line-height: 1.6; }
-
-  /* Code/content textarea */
-  .rf-textarea--code {
-    font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
     font-size: 12.5px;
-    line-height: 1.75;
-    border-top: none;
-    border-radius: 0 0 var(--adm-radius) var(--adm-radius);
-    resize: vertical;
-    min-height: 320px;
+    padding: 0.45rem 0.7rem;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .rf-textarea--code:focus {
+  .rf-insp-select:focus,
+  .rf-insp-input:focus {
     border-color: var(--adm-accent);
+    background: var(--adm-bg2);
     box-shadow: 0 0 0 3px var(--adm-accentbg);
   }
+  .rf-insp-input::placeholder { color: var(--adm-txt3); }
 
-  /* Select with custom arrow */
-  .rf-select {
+  .rf-insp-select {
     appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239b8c7e' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 10px center;
+    background-position: right 9px center;
     padding-right: 2rem;
     cursor: pointer;
   }
-
-  /* ── Editor header (label + tab switcher) ────────────────────────────────── */
-  .rf-editor-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
+  .rf-insp-select:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23c56b2d' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
-  .rf-tabs { display: flex; gap: 2px; }
-
-  .rf-tab {
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--adm-txt2);
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 4px 10px;
-    cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
-  }
-  .rf-tab:hover { color: var(--adm-txt); }
-  .rf-tab--active {
-    color: var(--adm-accent);
-    border-bottom-color: var(--adm-accent);
-  }
-
-  /* ── Formatting toolbar ──────────────────────────────────────────────────── */
-  .rf-toolbar {
+  /* ── Tag pill cloud ──────────────────────────────────────────────────────── */
+  .rf-tag-cloud {
     display: flex;
     flex-wrap: wrap;
-    gap: 3px;
-    background: var(--adm-bg3);
-    border: 1px solid var(--adm-border);
-    border-bottom: none;
-    border-radius: var(--adm-radius) var(--adm-radius) 0 0;
-    padding: 7px 8px;
+    gap: 5px;
+    margin-top: 0.125rem;
   }
 
-  .rf-toolbar-btn {
-    font-family: 'SF Mono', 'Consolas', monospace;
-    font-size: 11px;
+  .rf-tag-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 25px;
+    padding: 0 10px;
+    font-size: 11.5px;
+    font-weight: 500;
+    border: 1px solid var(--adm-border);
+    border-radius: 13px;
+    color: var(--adm-txt3);
+    background: var(--adm-bg3);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .rf-tag-pill:hover {
+    border-color: var(--adm-border2);
     color: var(--adm-txt2);
     background: var(--adm-bg2);
-    border: 1px solid var(--adm-border);
-    border-radius: 3px;
-    padding: 2px 7px;
-    cursor: pointer;
-    line-height: 1.6;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
   }
-  .rf-toolbar-btn:hover {
-    background: var(--adm-accent);
-    color: #fff;
+
+  /* Hidden actual checkbox */
+  .rf-tag-check {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  /* Checked state — :has() + .is-checked JS fallback */
+  .rf-tag-pill:has(.rf-tag-check:checked),
+  .rf-tag-pill.is-checked {
+    background: var(--adm-accentbg);
+    border-color: var(--adm-accentbd);
+    color: var(--adm-accent);
+    font-weight: 600;
+  }
+  .rf-tag-pill:has(.rf-tag-check:checked):hover,
+  .rf-tag-pill.is-checked:hover {
+    background: var(--adm-accentbg);
     border-color: var(--adm-accent);
   }
 
-  /* ── Preview panel ───────────────────────────────────────────────────────── */
-  .rf-preview {
-    border: 1px solid var(--adm-border);
-    border-radius: 0 0 var(--adm-radius) var(--adm-radius);
-    padding: 1.5rem;
-    min-height: 320px;
-    background: var(--adm-bg2);
-    font-size: 14px;
-    line-height: 1.75;
-    color: var(--adm-txt);
-  }
-  .rf-preview[hidden] { display: none; }
-
-  /* ── Sidebar ─────────────────────────────────────────────────────────────── */
-  .rf-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 0.875rem;
-    position: sticky;
-    /* nav bar (52px) + rf-topbar (~45px) + margin (1.75rem ≈ 28px) */
-    top: 125px;
-    max-height: calc(100vh - 140px);
-    overflow-y: auto;
-  }
-
-  .rf-panel-body {
-    padding: 0.875rem 1rem;
-  }
-  .rf-panel-body--stack {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .rf-meta-note {
-    font-size: 11px;
-    color: var(--adm-txt3);
-    margin-top: 0.5rem;
-  }
-
-  /* ── Tags ────────────────────────────────────────────────────────────────── */
-  .rf-tags-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    margin-top: 0.25rem;
-  }
-  .rf-tag-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--adm-txt2);
-    cursor: pointer;
-    transition: color 0.15s;
-    padding: 2px 0;
-  }
-  .rf-tag-label:hover .rf-tag-name { color: var(--adm-accent); }
-  .rf-tag-check { accent-color: var(--adm-accent); flex-shrink: 0; }
-  .rf-tag-name { line-height: 1.3; }
-
   /* ── Cover preview ───────────────────────────────────────────────────────── */
-  .rf-cover-preview { margin-top: 0.625rem; }
+  .rf-cover-preview { margin-top: 0; }
   .rf-cover-preview[hidden] { display: none; }
   .rf-cover-img {
-    width: 100%;
-    height: 100px;
-    object-fit: cover;
-    border-radius: var(--adm-radius);
-    border: 1px solid var(--adm-border);
     display: block;
+    width: calc(100% + 2rem);
+    margin: 0.625rem -1rem -0.75rem;
+    height: 120px;
+    object-fit: cover;
+    border-top: 1px solid var(--adm-border);
   }
 
   /* ── Error banner ────────────────────────────────────────────────────────── */
@@ -654,13 +754,23 @@ const updatedAt = isEdit && report?.updatedAt
 </style>
 
 <script define:vars={{ submitUrl, submitMethod, isEdit }}>
-  // ── Slug auto-generation ──────────────────────────────────────────────────
-  const titleEl  = document.getElementById('title');
-  const slugEl   = document.getElementById('slug');
-  const summaryEl = document.getElementById('summary');
-  const contentEl = document.getElementById('content');
-  let slugEdited = slugEl.value.length > 0 && isEdit;
+  const titleEl    = document.getElementById('title');
+  const slugEl     = document.getElementById('slug');
+  const summaryEl  = document.getElementById('summary');
+  const contentEl  = document.getElementById('content');
+  let   slugEdited = slugEl.value.length > 0 && isEdit;
 
+  // ── Auto-grow textareas ───────────────────────────────────────────────────
+  function autoGrow(el, minH = 0) {
+    el.style.height = 'auto';
+    el.style.height = Math.max(minH, el.scrollHeight) + 'px';
+  }
+  autoGrow(titleEl);
+  autoGrow(contentEl, 520);
+  titleEl.addEventListener('input',   () => autoGrow(titleEl));
+  contentEl.addEventListener('input', () => autoGrow(contentEl, 520));
+
+  // ── Slug auto-generation ──────────────────────────────────────────────────
   function clientSlugify(text) {
     return text.toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -669,11 +779,17 @@ const updatedAt = isEdit && report?.updatedAt
       .replace(/^-+|-+$/g, '')
       .trim();
   }
-
   titleEl.addEventListener('input', () => {
     if (!slugEdited) slugEl.value = clientSlugify(titleEl.value);
   });
   slugEl.addEventListener('input', () => { slugEdited = slugEl.value.length > 0; });
+
+  // ── Tag pill checked-state sync (JS fallback for :has()) ──────────────────
+  document.querySelectorAll('.rf-tag-check').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      cb.closest('.rf-tag-pill').classList.toggle('is-checked', cb.checked);
+    });
+  });
 
   // ── Cover image preview ───────────────────────────────────────────────────
   const coverInput   = document.getElementById('coverImage');
@@ -688,9 +804,9 @@ const updatedAt = isEdit && report?.updatedAt
   coverInput.addEventListener('input', updateCoverPreview);
   updateCoverPreview();
 
-  // ── Write / Preview tab switcher ─────────────────────────────────────────
-  const tabWrite   = document.getElementById('tab-write');
-  const tabPreview = document.getElementById('tab-preview');
+  // ── Write / Preview tabs ──────────────────────────────────────────────────
+  const tabWrite    = document.getElementById('tab-write');
+  const tabPreview  = document.getElementById('tab-preview');
   const writePanel  = document.getElementById('write-panel');
   const previewPanel = document.getElementById('preview-panel');
   const toolbar     = document.getElementById('editor-toolbar');
@@ -708,7 +824,6 @@ const updatedAt = isEdit && report?.updatedAt
     activateTab(tabWrite, tabPreview, writePanel, previewPanel);
     toolbar.hidden = false;
   });
-
   tabPreview.addEventListener('click', () => {
     activateTab(tabPreview, tabWrite, previewPanel, writePanel);
     toolbar.hidden = true;
@@ -719,8 +834,8 @@ const updatedAt = isEdit && report?.updatedAt
   // ── Toolbar formatting ────────────────────────────────────────────────────
   document.querySelectorAll('.rf-toolbar-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const tag   = btn.dataset.tag;
-      const close = btn.dataset.close;
+      const tag      = btn.dataset.tag;
+      const close    = btn.dataset.close;
       const start    = contentEl.selectionStart;
       const end      = contentEl.selectionEnd;
       const selected = contentEl.value.substring(start, end);
@@ -731,13 +846,14 @@ const updatedAt = isEdit && report?.updatedAt
       contentEl.selectionStart = start + tag.length;
       contentEl.selectionEnd   = start + tag.length + selected.length;
       contentEl.focus();
+      autoGrow(contentEl, 520);
     });
   });
 
   // ── Autosave (new reports only) ───────────────────────────────────────────
-  const DRAFT_KEY = 'adm-draft-new';
+  const DRAFT_KEY      = 'adm-draft-new';
   const autosaveStatus = document.getElementById('autosave-status');
-  let autosaveTimer = null;
+  let   autosaveTimer  = null;
 
   function setAutosaveLabel(msg) {
     if (!autosaveStatus) return;
@@ -747,13 +863,11 @@ const updatedAt = isEdit && report?.updatedAt
 
   function saveLocally() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({
-      title:   titleEl.value,
-      slug:    slugEl.value,
-      summary: summaryEl.value,
-      content: contentEl.value,
+      title: titleEl.value, slug: slugEl.value,
+      summary: summaryEl.value, content: contentEl.value,
       ts: Date.now(),
     }));
-    setAutosaveLabel('Guardado localmente');
+    setAutosaveLabel('Borrador guardado');
   }
 
   if (!isEdit) {
@@ -770,6 +884,8 @@ const updatedAt = isEdit && report?.updatedAt
             contentEl.value = stored.content || '';
             slugEdited = Boolean(stored.slug);
             banner.hidden = true;
+            autoGrow(titleEl);
+            autoGrow(contentEl, 520);
             setAutosaveLabel('Borrador restaurado');
           });
           document.getElementById('restore-dismiss')?.addEventListener('click', () => {
@@ -821,8 +937,7 @@ const updatedAt = isEdit && report?.updatedAt
       category:   document.getElementById('category').value,
       districtId: document.getElementById('districtId').value || null,
       coverImage: document.getElementById('coverImage').value.trim() || null,
-      status: targetStatus,
-      tags,
+      status: targetStatus, tags,
     };
 
     const btn = targetStatus === 'published'
@@ -845,13 +960,11 @@ const updatedAt = isEdit && report?.updatedAt
         localStorage.removeItem(DRAFT_KEY);
         window.location.href = `/admin/reports/${data.id}/edit`;
       } else {
-        const isPublished = targetStatus === 'published';
-        statusBadge.innerHTML =
-          `<span class="adm-badge__dot"></span>${isPublished ? 'Publicado' : 'Borrador'}`;
-        statusBadge.className = `adm-badge ${isPublished ? 'adm-badge--published' : 'adm-badge--draft'}`;
-        document.getElementById('btn-publish').textContent =
-          isPublished ? 'Actualizar' : 'Publicar';
-        toast(isPublished ? 'Publicado correctamente' : 'Guardado como borrador');
+        const pub = targetStatus === 'published';
+        statusBadge.className = `rf-insp-badge ${pub ? 'rf-insp-badge--published' : 'rf-insp-badge--draft'}`;
+        statusBadge.querySelector('.rf-insp-text').textContent = pub ? 'Publicado' : 'Borrador';
+        document.getElementById('btn-publish').textContent = pub ? 'Actualizar' : 'Publicar';
+        toast(pub ? 'Publicado correctamente' : 'Guardado como borrador');
       }
     } catch {
       showError('Error de red. Inténtalo de nuevo.');
@@ -861,8 +974,8 @@ const updatedAt = isEdit && report?.updatedAt
     }
   }
 
-  document.getElementById('btn-draft').addEventListener('click',   () => submit('draft'));
-  document.getElementById('btn-publish').addEventListener('click',  () => submit('published'));
+  document.getElementById('btn-draft').addEventListener('click',  () => submit('draft'));
+  document.getElementById('btn-publish').addEventListener('click', () => submit('published'));
 
   // ── ⌘S shortcut ──────────────────────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
