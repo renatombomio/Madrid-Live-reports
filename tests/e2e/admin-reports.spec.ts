@@ -30,6 +30,8 @@ test.describe('Admin — Report creation', () => {
 
     const title = `Draft E2E ${Date.now()}`;
     await page.fill('.rf-title-input', title);
+    await page.fill('.rf-summary-input', 'Resumen de prueba E2E para el borrador.');
+    await page.fill('.rf-content-input', 'Contenido de prueba E2E para el borrador del reporte.');
     await page.click('#btn-draft');
 
     // Should redirect to edit page after save
@@ -42,6 +44,8 @@ test.describe('Admin — Report creation', () => {
 
     const title = `Published E2E ${Date.now()}`;
     await page.fill('.rf-title-input', title);
+    await page.fill('.rf-summary-input', 'Resumen de prueba E2E para el reporte publicado.');
+    await page.fill('.rf-content-input', 'Contenido de prueba E2E para el reporte publicado.');
     await page.click('#btn-publish');
 
     // Should redirect to edit page
@@ -60,6 +64,8 @@ test.describe('Admin — Report editing', () => {
     const page = await browser.newPage();
     await page.goto('/admin/reports/new');
     await page.fill('.rf-title-input', title);
+    await page.fill('.rf-summary-input', 'Resumen E2E editable.');
+    await page.fill('.rf-content-input', 'Contenido E2E editable para el reporte de prueba.');
     await page.click('#btn-draft');
     await page.waitForURL(/\/admin\/reports\/[^/]+\/edit/, { timeout: 10_000 });
     editUrl = page.url();

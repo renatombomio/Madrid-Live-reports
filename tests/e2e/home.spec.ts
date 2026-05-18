@@ -4,18 +4,18 @@ test.describe('Home page', () => {
   test('loads and shows the hero', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Madrid Live Reports/);
-    await expect(page.getByText('Madrid en')).toBeVisible();
+    await expect(page.locator('.hero__title')).toBeVisible();
   });
 
   test('navigation links are present', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Informes' }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Reportes' }).first()).toBeVisible();
     await expect(page.getByRole('link', { name: 'Noticias' }).first()).toBeVisible();
   });
 
   test('reports page loads', async ({ page }) => {
     await page.goto('/reports');
-    await expect(page).toHaveTitle(/Informes/);
+    await expect(page).toHaveTitle(/Reportes/);
   });
 
   test('news page loads', async ({ page }) => {

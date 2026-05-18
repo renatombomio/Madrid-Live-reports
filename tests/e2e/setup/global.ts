@@ -22,7 +22,10 @@ export default async function globalSetup() {
   // 1 ── Create user via better-auth sign-up endpoint ─────────────────────────
   const signUpRes = await fetch(`${BASE_URL}/api/auth/sign-up/email`, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Origin': BASE_URL,
+    },
     body: JSON.stringify({
       email:    E2E_ADMIN_EMAIL,
       password: E2E_ADMIN_PASSWORD,

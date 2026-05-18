@@ -21,13 +21,14 @@ test.describe('Publishing flow', () => {
     // Create and publish
     await page.goto('/admin/reports/new');
     await page.fill('.rf-title-input', `E2E Published ${MARKER}`);
+    await page.fill('.rf-summary-input', 'Resumen E2E de reporte publicado.');
+    await page.fill('.rf-content-input', 'Contenido E2E del reporte publicado para prueba de visibilidad.');
     await page.click('#btn-publish');
     await page.waitForURL(/\/admin\/reports\/[^/]+\/edit/, { timeout: 10_000 });
     editUrl = page.url();
 
-    // Extract slug from the URL (…/edit → slug is the segment before /edit)
-    const parts = editUrl.split('/');
-    slug = parts[parts.indexOf('reports') + 1];
+    // Slug lives in the URL input field, not the path (path has the report ID)
+    slug = await page.locator('.rf-url-slug').inputValue();
 
     // Public list
     await page.goto('/reports');
@@ -40,7 +41,7 @@ test.describe('Publishing flow', () => {
 
     await page.goto(`/reports/${slug}`);
     await expect(page).not.toHaveURL(/\/reports\/?$/, { timeout: 5_000 });
-    await expect(page.getByText(`E2E Published ${MARKER}`)).toBeVisible();
+    await expect(page.getByRole('heading', { name: `E2E Published ${MARKER}` })).toBeVisible();
   });
 
   test('unpublishing hides report from public /reports', async ({ page }) => {
@@ -64,11 +65,13 @@ test.describe('Search visibility after publish', () => {
     // Create and publish
     await page.goto('/admin/reports/new');
     await page.fill('.rf-title-input', searchMarker);
+    await page.fill('.rf-summary-input', 'Resumen E2E para prueba de búsqueda.');
+    await page.fill('.rf-content-input', 'Contenido E2E del reporte para verificar visibilidad en búsqueda.');
     await page.click('#btn-publish');
     await page.waitForURL(/\/admin\/reports\/[^/]+\/edit/, { timeout: 10_000 });
 
-    // Search
+    // Search — check result card heading (getByText would also match the filter pill)
     await page.goto(`/search?q=${encodeURIComponent(searchMarker)}`);
-    await expect(page.getByText(searchMarker)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('heading', { name: searchMarker })).toBeVisible({ timeout: 5_000 });
   });
 });
