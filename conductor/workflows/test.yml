@@ -1,0 +1,24 @@
+workflow:
+  name: madrid-live-test
+  entry_point: analyze_project
+  runtime:
+    provider: claude
+
+agents:
+  - name: analyze_project
+    prompt: |
+      Analyze the Madrid Live project structure and explain:
+      - Main technologies
+      - Folder organization
+      - Testing setup
+      - Database architecture
+    routes:
+      - to: summarize
+
+  - name: summarize
+    input:
+      - analyze_project.output
+    prompt: |
+      Summarize the previous architectural analysis in a concise way for a junior developer.
+    routes:
+      - to: $end

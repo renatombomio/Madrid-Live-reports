@@ -38,7 +38,25 @@
       "Bash(cp ~/Downloads/Hero.astro src/components/Hero.astro)",
       "Bash(cp ~/Downloads/LiveCards.astro src/components/LiveCards.astro)",
       "Bash(grep -E \"\\\\.\\(astro|css\\)$\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git -C /Users/renato/Madrid-Live-reports status --short)",
+      "Bash(jobs)",
+      "Bash(pnpm astro *)",
+      "Bash(pkill -f \"astro dev\")",
+      "Bash(git *)",
+      "Bash(npx astro *)",
+      "Bash(npm run *)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(open *)",
+      "Bash(just db-up *)",
+      "Bash(pnpm test:integration *)",
+      "Bash(xargs ls)",
+      "Bash(npx tsc *)",
+      "Bash(pnpm test:e2e *)",
+      "Bash(pnpm exec *)",
+      "Bash(just db *)",
+      "Bash(npm *)",
+      "Bash(sh)"
     ]
   }
 }
